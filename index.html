@@ -164,6 +164,12 @@
       margin-bottom: 12px;
       font-weight: bold;
     }
+    .sub-date-text {
+      font-size: 0.9rem;
+      color: var(--text-sub);
+      font-weight: normal;
+      margin-left: 5px;
+    }
   </style>
 
   <!-- Firebase SDK 모듈 로드 -->
@@ -195,10 +201,24 @@
       createdAt: null,
       checks: [],   
       records: [],  
-      selectedDay: null // 접속/새로고침 시 항상 오늘 일자로 자동 구동되도록 null 처리
+      selectedDay: null
     };
 
     let unsubscribeRoom = null;
+
+    // 날짜 계산 Helper 함수 (DAY n에 해당하는 실제 연.월.일 반환)
+    function getDateByDayNumber(dayNumber) {
+      if (!window.appState.createdAt) return new Date().toLocaleDateString('ko-KR');
+      const startDate = new Date(window.appState.createdAt);
+      const targetDate = new Date(startDate);
+      targetDate.setDate(startDate.getDate() + (dayNumber - 1));
+      
+      const year = targetDate.getFullYear();
+      const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+      const day = String(targetDate.getDate()).padStart(2, '0');
+      
+      return `${year}. ${month}. ${day}.`;
+    }
 
     // 이미지 압축 Helper
     window.compressImage = function(file, maxWidth = 500, quality = 0.7) {
@@ -237,7 +257,6 @@
     };
 
     function saveSession() {
-      // 로컬 세션에 저장할 때도 selectedDay는 항상 null로 만들어 새로고침 시 오늘로 초기화되도록 보장
       const sessionData = { ...window.appState, selectedDay: null };
       localStorage.setItem('challenge_session', JSON.stringify(sessionData));
     }
@@ -247,7 +266,7 @@
       if (saved) {
         try {
           window.appState = JSON.parse(saved);
-          window.appState.selectedDay = null; // 재접속/새로고침 시 무조건 당일(오늘)을 기본 페이지로 설정
+          window.appState.selectedDay = null;
           if (window.appState.roomCode) {
             const codeBox = document.getElementById('displayInviteCode');
             if (codeBox) codeBox.innerText = window.appState.roomCode;
@@ -300,7 +319,7 @@
         downloadAnchor.click();
         downloadAnchor.remove();
 
-        alert("백업 파일이 다운로드되었습니다!");
+        alert("백업 파일이 다운로드되었습니다.");
       } catch (err) {
         alert("백업 파일 생성 중 오류 발생: " + err.message);
       }
@@ -507,6 +526,7 @@
       if (!text && !window.currentImageBase64) return alert('내용이나 사진을 첨부해주세요.');
 
       const targetDay = getActiveDayNumber();
+      const formattedDate = getDateByDayNumber(targetDay);
 
       const newRecord = {
         id: "rec_" + Date.now() + "_" + Math.random().toString(36).substring(2, 5),
@@ -514,6 +534,7 @@
         text: text,
         image: window.currentImageBase64 || null,
         day: Number(targetDay),
+        fullDate: formattedDate,
         timestamp: new Date().toISOString(),
         date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         comments: []
@@ -682,9 +703,12 @@
     window.updateDashboard = function() {
       const currentDay = getCurrentDayNumber();
       const activeDay = getActiveDayNumber();
+      const activeDateStr = getDateByDayNumber(activeDay);
 
-      document.getElementById('currentDay').innerText = currentDay;
-      
+      // 상단 DAY 타이틀 및 날짜 적용
+      document.getElementById('currentDay').innerText = activeDay;
+      document.getElementById('currentDate').innerText = `(${activeDateStr})`;
+
       const myInfo = window.appState.myInfo;
       document.getElementById('myProfileName').innerText = myInfo.name || '나';
       document.getElementById('myProfileGoal').innerText = myInfo.goal || '목표';
@@ -696,11 +720,11 @@
       renderAvatar('partnerAvatar', partnerInfo.photo, partnerInfo.name);
 
       const banner = document.getElementById('selectedDayBanner');
-      const dayLabel = (activeDay === currentDay) ? `오늘(DAY ${activeDay})` : `DAY ${activeDay}`;
+      const dayLabel = (activeDay === currentDay) ? `오늘 (DAY ${activeDay})` : `DAY ${activeDay}`;
       
       if (activeDay !== currentDay) {
         banner.classList.remove('hidden');
-        banner.innerHTML = `<span>📅 DAY ${activeDay} 일자를 선택 중입니다.</span>
+        banner.innerHTML = `<span>DAY ${activeDay} (${activeDateStr}) 일자를 선택 중입니다.</span>
                             <button type="button" class="btn-small secondary" onclick="resetToToday()">오늘로 돌아가기</button>`;
       } else {
         banner.classList.add('hidden');
@@ -711,10 +735,10 @@
       const quickBtn = document.getElementById('quickCheckBtn');
       if (quickBtn) {
         if (hasChecked) {
-          quickBtn.innerText = `✓ ${dayLabel} 목표 완료! (클릭하여 취소)`;
+          quickBtn.innerText = `${dayLabel} 목표 완료 (클릭하여 취소)`;
           quickBtn.style.background = "var(--text-sub)";
         } else {
-          quickBtn.innerText = `✔ ${dayLabel} 목표 체크하기`;
+          quickBtn.innerText = `${dayLabel} 목표 체크하기`;
           quickBtn.style.background = "var(--primary)";
         }
       }
@@ -794,13 +818,14 @@
       const listContainer = document.getElementById('recordsList');
       const filterTitle = document.getElementById('filterTitle');
       const activeDay = getActiveDayNumber();
+      const activeDateStr = getDateByDayNumber(activeDay);
 
       const records = (window.appState.records || []).filter(r => Number(r.day) === Number(activeDay));
       
       filterTitle.innerText = `DAY ${activeDay} 상세 기록 (${records.length}개)`;
 
       if (records.length === 0) {
-        listContainer.innerHTML = `<div style="color:var(--text-sub); font-size:0.9rem; padding: 15px 0; text-align:center;">DAY ${activeDay}에 작성된 상세 기록이 없습니다.</div>`;
+        listContainer.innerHTML = `<div style="color:var(--text-sub); font-size:0.9rem; padding: 15px 0; text-align:center;">DAY ${activeDay} (${activeDateStr})에 작성된 상세 기록이 없습니다.</div>`;
         return;
       }
 
@@ -810,6 +835,7 @@
         const recId = rec.id || rec.timestamp;
         const comments = rec.comments || [];
         const isMyRecord = rec.author === myName;
+        const recordDateStr = rec.fullDate || getDateByDayNumber(rec.day || activeDay);
         
         const commentsHtml = comments.map(c => `
           <div class="comment-item">
@@ -822,7 +848,7 @@
             <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; color:var(--text-sub);">
               <strong>${rec.author} <span style="font-weight:normal; color:var(--primary);">(DAY ${rec.day || 1})</span></strong>
               <div style="display:flex; align-items:center; gap:8px;">
-                <span>${rec.date || ''}</span>
+                <span>${recordDateStr} ${rec.date || ''}</span>
                 ${isMyRecord ? `
                   <button type="button" class="secondary btn-small" onclick="openEditRecordModal('${recId}')">수정</button>
                   <button type="button" class="secondary btn-small" style="color:var(--danger);" onclick="deleteRecord('${recId}')">삭제</button>
@@ -914,7 +940,7 @@
     <section id="dashboardSection" class="hidden">
       <div>
         <p>TOGETHER</p>
-        <h1>DAY <span id="currentDay">1</span> / 100</h1>
+        <h1>DAY <span id="currentDay">1</span> <span id="currentDate" class="sub-date-text"></span> / 100</h1>
       </div>
 
       <!-- 선택 날짜 정보 안내 배너 -->
@@ -946,7 +972,7 @@
 
       <!-- 목표 체크하기 버튼 (선택한 날짜 반영) -->
       <button type="button" id="quickCheckBtn" onclick="toggleQuickCheck()" style="margin-bottom: 15px;">
-        ✔ 목표 체크하기
+        목표 체크하기
       </button>
 
       <!-- 달력 현황 -->
@@ -980,7 +1006,7 @@
 
       <!-- 하단 시스템 제어 및 백업 버튼 -->
       <div style="display:flex; gap:10px; margin-top:20px;">
-        <button type="button" class="secondary" onclick="downloadBackup()">📦 데이터 백업하기</button>
+        <button type="button" class="secondary" onclick="downloadBackup()">데이터 백업하기</button>
         <button type="button" class="secondary" onclick="resetSession()">나가기 / 초기화</button>
       </div>
     </section>
