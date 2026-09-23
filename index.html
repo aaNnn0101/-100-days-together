@@ -11,7 +11,7 @@
       --card-bg: #ffffff;
       --text-main: #2c3e50;
       --text-sub: #7f8c8d;
-      --primary: #2ecc71; /* 기본값 */
+      --primary: #2ecc71;
       --primary-hover: #27ae60;
       --border-color: #e2e8f0;
       --shadow: 0 4px 15px rgba(0,0,0,0.05);
@@ -50,9 +50,7 @@
       background: none;
     }
     
-    .color-picker-wrapper input[type="color"]::-webkit-color-swatch-wrapper {
-      padding: 0;
-    }
+    .color-picker-wrapper input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
     .color-picker-wrapper input[type="color"]::-webkit-color-swatch {
       border: 2px solid var(--border-color);
       border-radius: 50%;
@@ -112,7 +110,6 @@
   <header>
     <div class="logo">100 DAYS TOGETHER</div>
     
-    <!-- Custom Color Picker -->
     <div class="color-picker-wrapper">
       <span>테마 색상</span>
       <input type="color" id="primaryColorPicker" value="#2ecc71" oninput="customThemeColor(this.value)">
@@ -126,29 +123,33 @@
       <h1>함께 100일을<br>달성해봐요.</h1>
       <p>방을 만들거나 친구의 초대코드로 참여하세요.</p>
       
-      <button onclick="showSection('createSection')">새로운 방 만들기</button>
-      <button class="secondary" onclick="showSection('joinSection')">초대코드로 참여하기</button>
+      <button type="button" onclick="showSection('createSection')">새로운 방 만들기</button>
+      <button type="button" class="secondary" onclick="showSection('joinSection')">초대코드로 참여하기</button>
     </section>
 
     <!-- 2. CREATE ROOM SECTION -->
     <section id="createSection" class="hidden">
       <h1>방 만들기</h1>
       <p>나의 이름과 목표를 설정하세요.</p>
-      <input type="text" id="createName" placeholder="이름 (예: 홍길동)">
-      <input type="text" id="createGoal" placeholder="목표 (예: 매일 영단어 10개 외우기)">
-      <button onclick="handleCreateRoom()">초대코드 생성하기</button>
-      <button class="secondary" onclick="showSection('startSection')">취소</button>
+      <form onsubmit="handleCreateRoom(event)">
+        <input type="text" id="createName" placeholder="이름 (예: 홍길동)">
+        <input type="text" id="createGoal" placeholder="목표 (예: 매일 영단어 10개 외우기)">
+        <button type="submit">초대코드 생성하기</button>
+        <button type="button" class="secondary" onclick="showSection('startSection')">취소</button>
+      </form>
     </section>
 
-    <!-- 3. JOIN ROOM SECTION -->
+    <!-- 3. JOIN ROOM SECTION (초기화 방지 적용) -->
     <section id="joinSection" class="hidden">
       <h1>챌린지 참여하기</h1>
       <p>초대코드를 입력하고 본인의 정보를 설정하세요.</p>
-      <input type="text" id="joinCode" placeholder="초대코드 6자리 입력">
-      <input type="text" id="joinName" placeholder="내 이름 (예: 김철수)">
-      <input type="text" id="joinGoal" placeholder="내 목표 (예: 매일 30분 운동하기)">
-      <button onclick="handleJoinRoom()">참여하기</button>
-      <button class="secondary" onclick="showSection('startSection')">취소</button>
+      <form onsubmit="handleJoinRoom(event)">
+        <input type="text" id="joinCode" placeholder="초대코드 입력">
+        <input type="text" id="joinName" placeholder="내 이름 (예: 김철수)">
+        <input type="text" id="joinGoal" placeholder="내 목표 (예: 매일 30분 운동하기)">
+        <button type="submit">참여하기</button>
+        <button type="button" class="secondary" onclick="showSection('startSection')">취소</button>
+      </form>
     </section>
 
     <!-- 4. INVITE CODE WAITING SECTION -->
@@ -156,8 +157,8 @@
       <p>초대코드</p>
       <div class="invite-code-box" id="displayInviteCode">------</div>
       <p>친구에게 이 코드를 알려주세요. 친구가 참여하면 챌린지가 시작됩니다.</p>
-      <button onclick="copyInviteCode()">코드 복사하기</button>
-      <button class="secondary" onclick="cancelWaiting()">뒤로 가기 (방 대기 취소)</button>
+      <button type="button" onclick="copyInviteCode()">코드 복사하기</button>
+      <button type="button" class="secondary" onclick="cancelWaiting()">뒤로 가기 (방 대기 취소)</button>
     </section>
 
     <!-- 5. MAIN DASHBOARD SECTION -->
@@ -173,7 +174,7 @@
           <div>
             <strong id="myProfileName">나</strong>: <span id="myProfileGoal">목표</span>
           </div>
-          <button class="edit-btn" onclick="openEditModal()">수정</button>
+          <button type="button" class="edit-btn" onclick="openEditModal()">수정</button>
         </div>
         <div class="profile-card">
           <div>
@@ -185,12 +186,12 @@
       <!-- 오늘의 기록 작성 -->
       <section style="padding: 15px; margin-top: 15px;">
         <h2>오늘의 기록 작성</h2>
-        <textarea id="recordText" rows="3" placeholder="오늘 목표를 달성하셨나요? 소감을 남겨주세요."></textarea>
-        
-        <input type="file" id="recordImageInput" accept="image/*" onchange="previewImage(event)">
-        <img id="imagePreview" class="image-preview" alt="미리보기">
-
-        <button onclick="saveRecord()">오늘의 인증 완료하기</button>
+        <form onsubmit="saveRecord(event)">
+          <textarea id="recordText" rows="3" placeholder="오늘 목표를 달성하셨나요? 소감을 남겨주세요."></textarea>
+          <input type="file" id="recordImageInput" accept="image/*" onchange="previewImage(event)">
+          <img id="imagePreview" class="image-preview" alt="미리보기">
+          <button type="submit">오늘의 인증 완료하기</button>
+        </form>
       </section>
 
       <!-- 기록 목록 -->
@@ -205,16 +206,17 @@
       <div class="modal-content">
         <h2>프로필 수정</h2>
         <p style="margin-bottom:10px;">이름과 목표를 변경할 수 있습니다.</p>
-        <input type="text" id="editName" placeholder="새로운 이름">
-        <input type="text" id="editGoal" placeholder="새로운 목표">
-        <button onclick="saveProfileEdit()">저장</button>
-        <button class="secondary" onclick="closeEditModal()">취소</button>
+        <form onsubmit="saveProfileEdit(event)">
+          <input type="text" id="editName" placeholder="새로운 이름">
+          <input type="text" id="editGoal" placeholder="새로운 목표">
+          <button type="submit">저장</button>
+          <button type="button" class="secondary" onclick="closeEditModal()">취소</button>
+        </form>
       </div>
     </div>
   </main>
 
   <script>
-    // State management
     let state = {
       roomCode: null,
       myInfo: { name: '', goal: '' },
@@ -222,13 +224,23 @@
       records: []
     };
 
-    // 1. CUSTOM COLOR PICKER FUNCTION
+    // UI 화면 전환 (새로고침 방지 적용)
+    function showSection(sectionId) {
+      const sections = ['startSection', 'createSection', 'joinSection', 'inviteSection', 'dashboardSection'];
+      sections.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+      });
+      
+      const target = document.getElementById(sectionId);
+      if (target) target.classList.remove('hidden');
+    }
+
+    // 테마 변경 기능
     function customThemeColor(hexColor) {
       document.documentElement.style.setProperty('--primary', hexColor);
-      
       const hoverColor = adjustColorBrightness(hexColor, -20);
       document.documentElement.style.setProperty('--primary-hover', hoverColor);
-
       localStorage.setItem('customPrimaryColor', hexColor);
     }
 
@@ -249,30 +261,10 @@
       }
     }
 
-    // UI SECTION TOGGLE
-    function showSection(sectionId, pushHistory = true) {
-      const sections = ['startSection', 'createSection', 'joinSection', 'inviteSection', 'dashboardSection'];
-      sections.forEach(id => {
-        document.getElementById(id).classList.add('hidden');
-      });
-      document.getElementById(sectionId).classList.remove('hidden');
-
-      if (pushHistory) {
-        history.pushState({ section: sectionId }, '', `#${sectionId}`);
-      }
-    }
-
-    // 뒤로가기 처리
-    window.onpopstate = function(event) {
-      if (event.state && event.state.section) {
-        showSection(event.state.section, false);
-      } else {
-        showSection('startSection', false);
-      }
-    };
-
-    // CREATE ROOM
-    function handleCreateRoom() {
+    // 방 만들기 (새로고침 방지)
+    function handleCreateRoom(e) {
+      if (e) e.preventDefault();
+      
       const name = document.getElementById('createName').value.trim();
       const goal = document.getElementById('createGoal').value.trim();
 
@@ -300,11 +292,13 @@
           showSection('dashboardSection');
           updateDashboard();
         }
-      }, 500);
+      }, 300);
     }
 
-    // JOIN ROOM
-    function handleJoinRoom() {
+    // 챌린지 참여하기 (초기화 버그 해결 핵심 함수)
+    function handleJoinRoom(e) {
+      if (e) e.preventDefault(); // 새로고침 현상 원천 차단
+      
       const code = document.getElementById('joinCode').value.trim();
       const name = document.getElementById('joinName').value.trim();
       const goal = document.getElementById('joinGoal').value.trim();
@@ -321,7 +315,7 @@
       updateDashboard();
     }
 
-    // PHOTO PREVIEW & RECORD SAVING
+    // 사진 프리뷰 및 저장
     let currentImageBase64 = null;
 
     function previewImage(event) {
@@ -338,7 +332,9 @@
       }
     }
 
-    function saveRecord() {
+    function saveRecord(e) {
+      if (e) e.preventDefault();
+      
       const text = document.getElementById('recordText').value.trim();
       if (!text && !currentImageBase64) return alert('내용 또는 인증 사진을 입력해주세요.');
 
@@ -378,7 +374,7 @@
       `).join('');
     }
 
-    // PROFILE EDIT
+    // 프로필 수정
     function updateDashboard() {
       document.getElementById('myProfileName').innerText = state.myInfo.name;
       document.getElementById('myProfileGoal').innerText = state.myInfo.goal;
@@ -397,7 +393,9 @@
       document.getElementById('editModal').classList.add('hidden');
     }
 
-    function saveProfileEdit() {
+    function saveProfileEdit(e) {
+      if (e) e.preventDefault();
+      
       const newName = document.getElementById('editName').value.trim();
       const newGoal = document.getElementById('editGoal').value.trim();
 
@@ -411,10 +409,10 @@
       alert('프로필이 수정되었습니다.');
     }
 
-    // 초기화
+    // 초기 실행
     window.onload = function() {
       loadSavedColor();
-      showSection('startSection', false);
+      showSection('startSection');
     };
   </script>
 </body>
