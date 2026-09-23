@@ -195,7 +195,7 @@
       createdAt: null,
       checks: [],   
       records: [],  
-      selectedDay: null // null이면 오늘 날짜를 기본 처리
+      selectedDay: null // 접속/새로고침 시 항상 오늘 일자로 자동 구동되도록 null 처리
     };
 
     let unsubscribeRoom = null;
@@ -237,7 +237,9 @@
     };
 
     function saveSession() {
-      localStorage.setItem('challenge_session', JSON.stringify(window.appState));
+      // 로컬 세션에 저장할 때도 selectedDay는 항상 null로 만들어 새로고침 시 오늘로 초기화되도록 보장
+      const sessionData = { ...window.appState, selectedDay: null };
+      localStorage.setItem('challenge_session', JSON.stringify(sessionData));
     }
 
     function loadSession() {
@@ -245,6 +247,7 @@
       if (saved) {
         try {
           window.appState = JSON.parse(saved);
+          window.appState.selectedDay = null; // 재접속/새로고침 시 무조건 당일(오늘)을 기본 페이지로 설정
           if (window.appState.roomCode) {
             const codeBox = document.getElementById('displayInviteCode');
             if (codeBox) codeBox.innerText = window.appState.roomCode;
@@ -268,6 +271,39 @@
       const codeBox = document.getElementById('displayInviteCode');
       if (codeBox) codeBox.innerText = "------";
       showSection('startSection');
+    };
+
+    // 데이터 백업 기능 (JSON 파일 다운로드)
+    window.downloadBackup = async function() {
+      if (!window.appState.roomCode) return alert("백업할 방 정보가 없습니다.");
+
+      try {
+        const roomRef = doc(db, "rooms", window.appState.roomCode);
+        const snapshot = await getDoc(roomRef);
+
+        if (!snapshot.exists()) {
+          return alert("데이터를 불러올 수 없습니다.");
+        }
+
+        const roomData = snapshot.data();
+        const backupObject = {
+          exportDate: new Date().toISOString(),
+          roomCode: window.appState.roomCode,
+          data: roomData
+        };
+
+        const jsonString = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupObject, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", jsonString);
+        downloadAnchor.setAttribute("download", `100days_backup_${window.appState.roomCode}_${new Date().toISOString().slice(0,10)}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+
+        alert("백업 파일이 다운로드되었습니다!");
+      } catch (err) {
+        alert("백업 파일 생성 중 오류 발생: " + err.message);
+      }
     };
 
     function listenToRoom(roomCode) {
@@ -437,12 +473,10 @@
       }
     };
 
-    // 현재 선택된 일자 얻기 (선택이 없으면 오늘 일자)
     function getActiveDayNumber() {
       return window.appState.selectedDay || getCurrentDayNumber();
     }
 
-    // 소급 적용 체크 토글 (오늘 및 선택한 소급 일자 모두 작동)
     window.toggleQuickCheck = async function() {
       const targetDay = getActiveDayNumber();
       const myName = window.appState.myInfo.name;
@@ -466,7 +500,6 @@
       }
     };
 
-    // 상세 기록 저장 (현재 선택 일자 반영)
     window.saveRecord = async function(e) {
       if (e) e.preventDefault();
 
@@ -510,7 +543,6 @@
       }
     };
 
-    // 상세 기록 삭제 & 수정
     window.deleteRecord = async function(recordId) {
       if (!confirm("이 상세 기록을 정말 삭제하시겠습니까?")) return;
 
@@ -593,7 +625,6 @@
       }
     };
 
-    // 댓글 작성
     window.addComment = async function(recordId) {
       const inputEl = document.getElementById(`commentInput_${recordId}`);
       if (!inputEl) return;
@@ -664,7 +695,6 @@
       document.getElementById('partnerProfileGoal').innerText = partnerInfo.goal || '대기 중...';
       renderAvatar('partnerAvatar', partnerInfo.photo, partnerInfo.name);
 
-      // 선택 일자 안내 배너 및 버튼 레이블 업데이트
       const banner = document.getElementById('selectedDayBanner');
       const dayLabel = (activeDay === currentDay) ? `오늘(DAY ${activeDay})` : `DAY ${activeDay}`;
       
@@ -705,7 +735,6 @@
       }
     }
 
-    // 달력 렌더링
     function renderCalendar(currentDay) {
       const calendarEl = document.getElementById('calendarGrid');
       if (!calendarEl) return;
@@ -949,7 +978,11 @@
         <div id="recordsList">달력에서 날짜를 클릭해주세요.</div>
       </section>
 
-      <button type="button" class="secondary" onclick="resetSession()" style="margin-top:20px;">나가기 / 초기화</button>
+      <!-- 하단 시스템 제어 및 백업 버튼 -->
+      <div style="display:flex; gap:10px; margin-top:20px;">
+        <button type="button" class="secondary" onclick="downloadBackup()">📦 데이터 백업하기</button>
+        <button type="button" class="secondary" onclick="resetSession()">나가기 / 초기화</button>
+      </div>
     </section>
   </main>
 
