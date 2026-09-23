@@ -79,6 +79,7 @@
     }
     button:hover { background: var(--primary-hover); }
     button.secondary { background: transparent; color: var(--text-sub); border: 1px solid var(--border-color); }
+    button.btn-small { width: auto; padding: 4px 10px; font-size: 0.8rem; margin: 0; }
 
     .invite-code-box {
       font-size: 2rem; font-weight: bold; letter-spacing: 4px;
@@ -87,54 +88,66 @@
       transition: color 0.3s ease;
     }
 
+    /* PROFILE CARD & AVATAR STYLES */
     .profile-card {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 12px 15px; background: var(--bg-color); border-radius: 8px; margin-bottom: 10px;
+      padding: 12px 15px; background: var(--bg-color); border-radius: 12px; margin-bottom: 10px;
+    }
+    .profile-left { display: flex; align-items: center; gap: 12px; }
+    .profile-avatar {
+      width: 44px; height: 44px; border-radius: 50%;
+      object-fit: cover; background: var(--primary-light); color: var(--text-main);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: bold; font-size: 1.1rem; flex-shrink: 0;
+      border: 2px solid var(--card-bg);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    /* MODAL STYLES */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: var(--card-bg); width: 90%; max-width: 400px;
+      padding: 20px; border-radius: 16px; box-shadow: var(--shadow);
     }
 
     /* CALENDAR STYLES */
     .calendar-grid {
-      display: grid;
-      grid-template-columns: repeat(10, 1fr);
-      gap: 5px;
-      margin-top: 10px;
-      max-height: 250px;
-      overflow-y: auto;
-      padding-right: 5px;
+      display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px;
+      margin-top: 10px; max-height: 250px; overflow-y: auto; padding-right: 5px;
     }
     .day-cell {
-      aspect-ratio: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.75rem;
-      font-weight: bold;
-      border-radius: 6px;
-      background: var(--bg-color);
-      color: var(--text-sub);
-      cursor: pointer;
-      border: 1px solid transparent;
-      transition: all 0.2s ease;
+      aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: bold; border-radius: 6px;
+      background: var(--bg-color); color: var(--text-sub); cursor: pointer;
+      border: 1px solid transparent; transition: all 0.2s ease;
     }
     .day-cell:hover { border-color: var(--primary); }
     .day-cell.today { border: 2px solid var(--primary); }
     .day-cell.partial { background: var(--primary-light); color: var(--text-main); }
     .day-cell.complete { background: var(--primary); color: white; }
-    .day-cell.selected { ring: 2px solid var(--text-main); transform: scale(1.05); }
+    .day-cell.selected { outline: 2px solid var(--text-main); transform: scale(1.05); }
 
     .calendar-legend {
-      display: flex;
-      justify-content: flex-end;
-      gap: 12px;
-      font-size: 0.75rem;
-      color: var(--text-sub);
-      margin-top: 10px;
+      display: flex; justify-content: flex-end; gap: 12px;
+      font-size: 0.75rem; color: var(--text-sub); margin-top: 10px;
     }
     .legend-item { display: flex; align-items: center; gap: 4px; }
     .legend-box { width: 12px; height: 12px; border-radius: 3px; }
 
     .image-preview { width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; display: none; }
     .record-img { width: 100%; max-height: 250px; object-fit: cover; border-radius: 8px; margin-top: 10px; }
+
+    /* COMMENT STYLES */
+    .comments-section { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color); }
+    .comment-item { font-size: 0.85rem; padding: 4px 0; color: var(--text-main); }
+    .comment-item strong { color: var(--text-sub); margin-right: 5px; }
+    .comment-input-box { display: flex; gap: 5px; margin-top: 8px; }
+    .comment-input-box input { margin-bottom: 0; padding: 6px 10px; font-size: 0.85rem; }
+    .comment-input-box button { width: auto; padding: 6px 12px; font-size: 0.85rem; margin-top: 0; white-space: nowrap; }
   </style>
 
   <!-- Firebase SDK 모듈 로드 -->
@@ -163,11 +176,11 @@
     window.appState = {
       roomCode: null,
       role: null,
-      myInfo: { name: '', goal: '' },
-      partnerInfo: { name: '상대방', goal: '대기 중...' },
+      myInfo: { name: '', goal: '', photo: null },
+      partnerInfo: { name: '상대방', goal: '대기 중...', photo: null },
       createdAt: null,
       records: [],
-      selectedDay: null // 필터링용 날짜 선택값
+      selectedDay: null
     };
 
     let unsubscribeRoom = null;
@@ -200,8 +213,8 @@
       if (unsubscribeRoom) unsubscribeRoom();
       window.appState = {
         roomCode: null, role: null,
-        myInfo: { name: '', goal: '' },
-        partnerInfo: { name: '상대방', goal: '대기 중...' },
+        myInfo: { name: '', goal: '', photo: null },
+        partnerInfo: { name: '상대방', goal: '대기 중...', photo: null },
         createdAt: null, records: [], selectedDay: null
       };
       const codeBox = document.getElementById('displayInviteCode');
@@ -232,17 +245,17 @@
         window.appState.createdAt = data.createdAt || new Date().toISOString();
 
         if (role === 'creator') {
-          window.appState.myInfo = data.creator || { name: '', goal: '' };
+          window.appState.myInfo = data.creator || { name: '', goal: '', photo: null };
           if (data.joiner) {
             window.appState.partnerInfo = data.joiner;
             showSection('dashboardSection');
           } else {
-            window.appState.partnerInfo = { name: '상대방', goal: '대기 중...' };
+            window.appState.partnerInfo = { name: '상대방', goal: '대기 중...', photo: null };
             showSection('inviteSection');
           }
         } else if (role === 'joiner') {
-          window.appState.myInfo = data.joiner || { name: '', goal: '' };
-          window.appState.partnerInfo = data.creator || { name: '방장', goal: '' };
+          window.appState.myInfo = data.joiner || { name: '', goal: '', photo: null };
+          window.appState.partnerInfo = data.creator || { name: '방장', goal: '', photo: null };
           showSection('dashboardSection');
         }
 
@@ -253,7 +266,7 @@
     }
 
     // -------------------------------------------------------------
-    // 3. 방 만들기
+    // 3. 방 만들기 & 방 참여하기
     // -------------------------------------------------------------
     window.handleCreateRoom = async function(e) {
       if (e) e.preventDefault();
@@ -267,7 +280,7 @@
 
       window.appState.roomCode = roomCode;
       window.appState.role = 'creator';
-      window.appState.myInfo = { name, goal };
+      window.appState.myInfo = { name, goal, photo: null };
       window.appState.createdAt = createdAt;
 
       document.getElementById('displayInviteCode').innerText = roomCode;
@@ -276,7 +289,7 @@
         await setDoc(doc(db, "rooms", roomCode), {
           roomCode: roomCode,
           createdAt: createdAt,
-          creator: { name, goal },
+          creator: { name, goal, photo: null },
           joiner: null,
           records: []
         });
@@ -289,9 +302,6 @@
       }
     };
 
-    // -------------------------------------------------------------
-    // 4. 방 참여하기
-    // -------------------------------------------------------------
     window.handleJoinRoom = async function(e) {
       if (e) e.preventDefault();
 
@@ -310,11 +320,11 @@
 
       window.appState.roomCode = code;
       window.appState.role = 'joiner';
-      window.appState.myInfo = { name, goal };
+      window.appState.myInfo = { name, goal, photo: null };
 
       try {
         await updateDoc(roomRef, {
-          joiner: { name, goal }
+          joiner: { name, goal, photo: null }
         });
 
         saveSession();
@@ -325,23 +335,91 @@
     };
 
     // -------------------------------------------------------------
-    // 5. 인증 기록 저장
+    // 4. 프로필(이름, 목표, 사진) 수정 기능
     // -------------------------------------------------------------
-    window.saveRecord = async function(e) {
+    window.openProfileModal = function() {
+      document.getElementById('editName').value = window.appState.myInfo.name || '';
+      document.getElementById('editGoal').value = window.appState.myInfo.goal || '';
+      window.tempProfilePhoto = window.appState.myInfo.photo || null;
+      
+      const imgPreview = document.getElementById('editPhotoPreview');
+      if (window.tempProfilePhoto) {
+        imgPreview.src = window.tempProfilePhoto;
+        imgPreview.style.display = 'block';
+      } else {
+        imgPreview.style.display = 'none';
+      }
+
+      document.getElementById('profileModal').classList.remove('hidden');
+    };
+
+    window.closeProfileModal = function() {
+      document.getElementById('profileModal').classList.add('hidden');
+    };
+
+    window.handleProfilePhotoChange = function(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          window.tempProfilePhoto = e.target.result;
+          const imgPreview = document.getElementById('editPhotoPreview');
+          imgPreview.src = window.tempProfilePhoto;
+          imgPreview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+
+    window.saveProfileModal = async function() {
+      const name = document.getElementById('editName').value.trim();
+      const goal = document.getElementById('editGoal').value.trim();
+
+      if (!name || !goal) return alert('이름과 목표를 입력해주세요.');
+
+      const updatedInfo = {
+        name: name,
+        goal: goal,
+        photo: window.tempProfilePhoto || null
+      };
+
+      window.appState.myInfo = updatedInfo;
+
+      try {
+        const roomRef = doc(db, "rooms", window.appState.roomCode);
+        const updateData = {};
+        if (window.appState.role === 'creator') {
+          updateData.creator = updatedInfo;
+        } else {
+          updateData.joiner = updatedInfo;
+        }
+        await updateDoc(roomRef, updateData);
+        closeProfileModal();
+      } catch (err) {
+        alert("프로필 수정 실패: " + err.message);
+      }
+    };
+
+    // -------------------------------------------------------------
+    // 5. 인증 및 원클릭 체크 기능
+    // -------------------------------------------------------------
+    window.saveRecord = async function(e, customText = null) {
       if (e) e.preventDefault();
 
-      const text = document.getElementById('recordText').value.trim();
+      const text = customText !== null ? customText : document.getElementById('recordText').value.trim();
       if (!text && !window.currentImageBase64) return alert('내용이나 사진을 첨부해주세요.');
 
       const currentDay = getCurrentDayNumber();
 
       const newRecord = {
+        id: "rec_" + Date.now() + "_" + Math.random().toString(36).substring(2, 5),
         author: window.appState.myInfo.name,
         text: text,
         image: window.currentImageBase64 || null,
         day: currentDay,
         timestamp: new Date().toISOString(),
-        date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        comments: []
       };
 
       try {
@@ -350,16 +428,54 @@
           records: arrayUnion(newRecord)
         });
 
-        document.getElementById('recordText').value = '';
-        document.getElementById('recordImageInput').value = '';
-        document.getElementById('imagePreview').style.display = 'none';
-        window.currentImageBase64 = null;
+        if (!customText) {
+          document.getElementById('recordText').value = '';
+          document.getElementById('recordImageInput').value = '';
+          document.getElementById('imagePreview').style.display = 'none';
+          window.currentImageBase64 = null;
+        }
       } catch (err) {
         alert("기록 저장 실패: " + err.message);
       }
     };
 
-    // 날짜 및 Day 계산 도우미
+    window.quickCheckIn = function() {
+      window.saveRecord(null, "오늘 목표 완수!");
+    };
+
+    // -------------------------------------------------------------
+    // 6. 댓글 작성 기능
+    // -------------------------------------------------------------
+    window.addComment = async function(recordId) {
+      const inputEl = document.getElementById(`commentInput_${recordId}`);
+      if (!inputEl) return;
+      const commentText = inputEl.value.trim();
+      if (!commentText) return alert("댓글 내용을 입력해주세요.");
+
+      const records = window.appState.records || [];
+      const updatedRecords = records.map(rec => {
+        if (rec.id === recordId || rec.timestamp === recordId) {
+          const comments = rec.comments || [];
+          comments.push({
+            author: window.appState.myInfo.name,
+            text: commentText,
+            date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          });
+          return { ...rec, comments };
+        }
+        return rec;
+      });
+
+      try {
+        const roomRef = doc(db, "rooms", window.appState.roomCode);
+        await updateDoc(roomRef, { records: updatedRecords });
+        inputEl.value = '';
+      } catch (err) {
+        alert("댓글 작성 실패: " + err.message);
+      }
+    };
+
+    // Helper 도우미 함수
     function getCurrentDayNumber() {
       if (!window.appState.createdAt) return 1;
       const start = new Date(window.appState.createdAt);
@@ -371,7 +487,6 @@
       return diffDays > 100 ? 100 : diffDays;
     }
 
-    // UI Helper 함수
     window.showSection = function(sectionId) {
       const sections = ['startSection', 'createSection', 'joinSection', 'inviteSection', 'dashboardSection'];
       sections.forEach(id => {
@@ -385,16 +500,49 @@
     window.updateDashboard = function() {
       const currentDay = getCurrentDayNumber();
       document.getElementById('currentDay').innerText = currentDay;
-      document.getElementById('myProfileName').innerText = window.appState.myInfo.name || '나';
-      document.getElementById('myProfileGoal').innerText = window.appState.myInfo.goal || '목표';
-      document.getElementById('partnerProfileName').innerText = window.appState.partnerInfo.name || '상대방';
-      document.getElementById('partnerProfileGoal').innerText = window.appState.partnerInfo.goal || '대기 중...';
       
+      // 내 프로필 업데이트
+      const myInfo = window.appState.myInfo;
+      document.getElementById('myProfileName').innerText = myInfo.name || '나';
+      document.getElementById('myProfileGoal').innerText = myInfo.goal || '목표';
+      renderAvatar('myAvatar', myInfo.photo, myInfo.name);
+
+      // 상대방 프로필 업데이트
+      const partnerInfo = window.appState.partnerInfo;
+      document.getElementById('partnerProfileName').innerText = partnerInfo.name || '상대방';
+      document.getElementById('partnerProfileGoal').innerText = partnerInfo.goal || '대기 중...';
+      renderAvatar('partnerAvatar', partnerInfo.photo, partnerInfo.name);
+
+      // 오늘 간편 체크 여부 확인
+      const records = window.appState.records || [];
+      const hasCheckedToday = records.some(r => r.day === currentDay && r.author === myInfo.name);
+      const quickBtn = document.getElementById('quickCheckBtn');
+      if (quickBtn) {
+        if (hasCheckedToday) {
+          quickBtn.innerText = "✓ 오늘 인증 완료!";
+          quickBtn.style.background = "var(--text-sub)";
+          quickBtn.disabled = true;
+        } else {
+          quickBtn.innerText = "✔ 오늘 목표 체크하기 (원클릭)";
+          quickBtn.style.background = "var(--primary)";
+          quickBtn.disabled = false;
+        }
+      }
+
       renderCalendar(currentDay);
       renderRecords();
     };
 
-    // 달력 렌더링 함수
+    function renderAvatar(elementId, photoUrl, name) {
+      const avatarEl = document.getElementById(elementId);
+      if (!avatarEl) return;
+      if (photoUrl) {
+        avatarEl.innerHTML = `<img src="${photoUrl}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+      } else {
+        avatarEl.innerHTML = (name && name.length > 0) ? name.charAt(0) : '?';
+      }
+    }
+
     function renderCalendar(currentDay) {
       const calendarEl = document.getElementById('calendarGrid');
       if (!calendarEl) return;
@@ -402,7 +550,6 @@
       const records = window.appState.records || [];
       const dayStats = {};
 
-      // 일차별 각 사용자별 달성 여부 집계
       records.forEach(rec => {
         const d = rec.day || 1;
         if (!dayStats[d]) dayStats[d] = new Set();
@@ -415,9 +562,9 @@
         let statusClass = '';
         
         if (authors >= 2) {
-          statusClass = 'complete'; // 2명 모두 완료
+          statusClass = 'complete';
         } else if (authors === 1) {
-          statusClass = 'partial';  // 1명 완료
+          statusClass = 'partial';
         }
 
         if (i === currentDay) statusClass += ' today';
@@ -430,7 +577,7 @@
 
     window.filterByDay = function(day) {
       if (window.appState.selectedDay === day) {
-        window.appState.selectedDay = null; // 필터 해제
+        window.appState.selectedDay = null;
       } else {
         window.appState.selectedDay = day;
       }
@@ -463,16 +610,36 @@
         return;
       }
 
-      listContainer.innerHTML = records.slice().reverse().map(rec => `
-        <div style="background: var(--bg-color); padding: 12px; border-radius: 8px; margin-top: 10px;">
-          <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-sub);">
-            <strong>${rec.author} <span style="font-weight:normal; color:var(--primary);">(DAY ${rec.day || 1})</span></strong>
-            <span>${rec.date}</span>
+      listContainer.innerHTML = records.slice().reverse().map(rec => {
+        const recId = rec.id || rec.timestamp;
+        const comments = rec.comments || [];
+        
+        const commentsHtml = comments.map(c => `
+          <div class="comment-item">
+            <strong>${c.author}:</strong> ${c.text}
           </div>
-          ${rec.text ? `<p style="margin: 8px 0 0 0; color:var(--text-main);">${rec.text}</p>` : ''}
-          ${rec.image ? `<img src="${rec.image}" class="record-img">` : ''}
-        </div>
-      `).join('');
+        `).join('');
+
+        return `
+          <div style="background: var(--bg-color); padding: 12px; border-radius: 8px; margin-top: 10px;">
+            <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-sub);">
+              <strong>${rec.author} <span style="font-weight:normal; color:var(--primary);">(DAY ${rec.day || 1})</span></strong>
+              <span>${rec.date}</span>
+            </div>
+            ${rec.text ? `<p style="margin: 8px 0 0 0; color:var(--text-main);">${rec.text}</p>` : ''}
+            ${rec.image ? `<img src="${rec.image}" class="record-img">` : ''}
+
+            <!-- 댓글 영역 -->
+            <div class="comments-section">
+              <div id="commentsList_${recId}">${commentsHtml}</div>
+              <div class="comment-input-box">
+                <input type="text" id="commentInput_${recId}" placeholder="댓글 달기..." onkeydown="if(event.key==='Enter') addComment('${recId}')">
+                <button type="button" onclick="addComment('${recId}')">등록</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
     // 초기 실행
@@ -547,18 +714,34 @@
         <h1>DAY <span id="currentDay">1</span> / 100</h1>
       </div>
 
+      <!-- 프로필 카드 및 수정 버튼 -->
       <div style="margin: 15px 0;">
         <div class="profile-card">
-          <div>
-            <strong id="myProfileName">나</strong>: <span id="myProfileGoal">목표</span>
+          <div class="profile-left">
+            <div class="profile-avatar" id="myAvatar">나</div>
+            <div>
+              <strong id="myProfileName">나</strong>
+              <p style="margin:2px 0 0 0; font-size:0.85rem;" id="myProfileGoal">목표</p>
+            </div>
           </div>
+          <button type="button" class="secondary btn-small" onclick="openProfileModal()">수정</button>
         </div>
+
         <div class="profile-card">
-          <div>
-            <strong id="partnerProfileName">상대방</strong>: <span id="partnerProfileGoal">목표</span>
+          <div class="profile-left">
+            <div class="profile-avatar" id="partnerAvatar">상</div>
+            <div>
+              <strong id="partnerProfileName">상대방</strong>
+              <p style="margin:2px 0 0 0; font-size:0.85rem;" id="partnerProfileGoal">목표</p>
+            </div>
           </div>
         </div>
       </div>
+
+      <!-- 간편 체크 버튼 -->
+      <button type="button" id="quickCheckBtn" onclick="quickCheckIn()" style="margin-bottom: 15px;">
+        ✔ 오늘 목표 체크하기 (원클릭)
+      </button>
 
       <!-- 100일 달력 영역 -->
       <section style="padding: 15px; margin-top: 15px;">
@@ -570,18 +753,18 @@
         </div>
       </section>
 
-      <!-- 오늘의 기록 작성 -->
+      <!-- 상세 기록 작성 -->
       <section style="padding: 15px; margin-top: 15px;">
-        <h2>오늘의 기록 작성</h2>
+        <h2>오늘의 상세 기록 작성</h2>
         <form onsubmit="saveRecord(event)">
-          <textarea id="recordText" rows="3" placeholder="오늘 목표를 달성하셨나요? 소감을 남겨주세요."></textarea>
+          <textarea id="recordText" rows="3" placeholder="오늘 목표 달성 소감이나 일기를 남겨주세요."></textarea>
           <input type="file" id="recordImageInput" accept="image/*" onchange="previewImage(event)">
           <img id="imagePreview" class="image-preview" alt="미리보기">
-          <button type="submit">오늘의 인증 완료하기</button>
+          <button type="submit">인증글 등록하기</button>
         </form>
       </section>
 
-      <!-- 기록 목록 -->
+      <!-- 기록 목록 & 댓글 -->
       <section style="padding: 15px; margin-top: 15px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <h2 id="filterTitle">전체 기록 목록</h2>
@@ -594,8 +777,30 @@
     </section>
   </main>
 
+  <!-- 프로필 수정 모달 팝업 -->
+  <div id="profileModal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h2>내 프로필 수정</h2>
+      <div style="margin: 15px 0;">
+        <label style="font-size:0.85rem; color:var(--text-sub);">이름</label>
+        <input type="text" id="editName" placeholder="이름 입력">
+
+        <label style="font-size:0.85rem; color:var(--text-sub);">목표</label>
+        <input type="text" id="editGoal" placeholder="목표 입력">
+
+        <label style="font-size:0.85rem; color:var(--text-sub);">프로필 사진</label>
+        <input type="file" id="editPhotoInput" accept="image/*" onchange="handleProfilePhotoChange(event)" style="margin-top:5px;">
+        <img id="editPhotoPreview" class="image-preview" style="width:70px; height:70px; border-radius:50%; margin:10px 0 0 0;" alt="미리보기">
+      </div>
+
+      <button type="button" onclick="saveProfileModal()">저장하기</button>
+      <button type="button" class="secondary" onclick="closeProfileModal()">취소</button>
+    </div>
+  </div>
+
   <script>
     window.currentImageBase64 = null;
+    window.tempProfilePhoto = null;
 
     function previewImage(event) {
       const file = event.target.files[0];
