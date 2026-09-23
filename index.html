@@ -5,52 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🌱 100 DAYS TOGETHER</title>
   <style>
-    /* ========== CSS VARIABLES & THEMES ========== */
+    /* ========== CSS VARIABLES ========== */
     :root {
       --bg-color: #f4f7f6;
       --card-bg: #ffffff;
       --text-main: #2c3e50;
       --text-sub: #7f8c8d;
-      --primary: #2ecc71;
+      --primary: #2ecc71; /* 기본값: 새싹 Green */
       --primary-hover: #27ae60;
       --border-color: #e2e8f0;
       --shadow: 0 4px 15px rgba(0,0,0,0.05);
     }
 
-    [data-theme="pink"] {
-      --bg-color: #fff0f5;
-      --card-bg: #ffffff;
-      --text-main: #4a2e35;
-      --text-sub: #9e7381;
-      --primary: #ff6b81;
-      --primary-hover: #ff4757;
-      --border-color: #f8d7da;
-    }
-
-    [data-theme="dark"] {
-      --bg-color: #1a1a2e;
-      --card-bg: #16213e;
-      --text-main: #e9ecef;
-      --text-sub: #a0aec0;
-      --primary: #0f3460;
-      --primary-hover: #1e56a0;
-      --border-color: #2a2a40;
-    }
-
-    [data-theme="blue"] {
-      --bg-color: #f0f8ff;
-      --card-bg: #ffffff;
-      --text-main: #1e3a8a;
-      --text-sub: #64748b;
-      --primary: #3b82f6;
-      --primary-hover: #2563eb;
-      --border-color: #dbeafe;
-    }
-
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: var(--bg-color); color: var(--text-main); transition: all 0.3s ease; padding-bottom: 50px; }
+    body { background-color: var(--bg-color); color: var(--text-main); transition: background-color 0.3s ease; padding-bottom: 50px; }
 
-    /* ========== HEADER & THEME SELECTOR ========== */
+    /* ========== HEADER & COLOR PICKER ========== */
     header {
       background: var(--card-bg);
       padding: 15px 20px;
@@ -60,14 +30,32 @@
       border-bottom: 1px solid var(--border-color);
       box-shadow: var(--shadow);
     }
-    .logo { font-size: 1.2rem; font-weight: bold; color: var(--primary); }
-    .theme-selector select {
-      padding: 6px 12px;
-      border-radius: 8px;
-      border: 1px solid var(--border-color);
-      background: var(--card-bg);
-      color: var(--text-main);
+    .logo { font-size: 1.2rem; font-weight: bold; color: var(--primary); transition: color 0.3s ease; }
+    
+    .color-picker-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: var(--text-sub);
+    }
+    
+    .color-picker-wrapper input[type="color"] {
+      -webkit-appearance: none;
+      border: none;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
       cursor: pointer;
+      background: none;
+    }
+    
+    .color-picker-wrapper input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+    .color-picker-wrapper input[type="color"]::-webkit-color-swatch {
+      border: 2px solid var(--border-color);
+      border-radius: 50%;
     }
 
     /* ========== CONTAINER & CARDS ========== */
@@ -87,7 +75,7 @@
     button {
       width: 100%; padding: 12px; border: none; border-radius: 8px;
       background: var(--primary); color: white; font-weight: bold; font-size: 1rem;
-      cursor: pointer; transition: 0.2s ease; margin-top: 5px;
+      cursor: pointer; transition: background 0.2s ease; margin-top: 5px;
     }
     button:hover { background: var(--primary-hover); }
     button.secondary { background: transparent; color: var(--text-sub); border: 1px solid var(--border-color); }
@@ -97,6 +85,7 @@
       font-size: 2rem; font-weight: bold; letter-spacing: 4px;
       text-align: center; color: var(--primary); padding: 15px;
       background: var(--bg-color); border-radius: 8px; margin: 15px 0;
+      transition: color 0.3s ease;
     }
 
     .profile-card {
@@ -121,18 +110,16 @@
 
   <header>
     <div class="logo">🌱 100 DAYS TOGETHER</div>
-    <div class="theme-selector">
-      <select id="themeSelect" onchange="changeTheme(this.value)">
-        <option value="default">🌱 Green</option>
-        <option value="pink">🌸 Pink</option>
-        <option value="dark">🌙 Dark</option>
-        <option value="blue">🌊 Blue</option>
-      </select>
+    
+    <!-- Custom Color Picker -->
+    <div class="color-picker-wrapper">
+      <span>🎨 메인 색상</span>
+      <input type="color" id="primaryColorPicker" value="#2ecc71" oninput="customThemeColor(this.value)">
     </div>
   </header>
 
   <main>
-    <!-- 1. START SECTION (방 만들기 / 입장하기 선택) -->
+    <!-- 1. START SECTION -->
     <section id="startSection">
       <p>100일 챌린지</p>
       <h1>함께 100일을<br>달성해봐요.</h1>
@@ -152,7 +139,7 @@
       <button class="secondary" onclick="showSection('startSection')">취소</button>
     </section>
 
-    <!-- 3. JOIN ROOM SECTION (상대방도 이름/목표 설정 가능) -->
+    <!-- 3. JOIN ROOM SECTION -->
     <section id="joinSection" class="hidden">
       <h1>챌린지 참여하기</h1>
       <p>초대코드를 입력하고 본인의 정보를 설정하세요.</p>
@@ -163,7 +150,7 @@
       <button class="secondary" onclick="showSection('startSection')">취소</button>
     </section>
 
-    <!-- 4. INVITE CODE WAITING SECTION (버그 수정: 뒤로가기 지원) -->
+    <!-- 4. INVITE CODE WAITING SECTION -->
     <section id="inviteSection" class="hidden">
       <p>초대코드</p>
       <div class="invite-code-box" id="displayInviteCode">------</div>
@@ -179,7 +166,7 @@
         <h1>DAY <span id="currentDay">1</span> / 100</h1>
       </div>
 
-      <!-- 내 프로필 & 상대방 프로필 -->
+      <!-- 프로필 영역 -->
       <div style="margin: 15px 0;">
         <div class="profile-card">
           <div>
@@ -194,19 +181,18 @@
         </div>
       </div>
 
-      <!-- 오늘의 기록 작성 (사진 기능 추가) -->
+      <!-- 오늘의 기록 작성 (사진 기능) -->
       <section style="padding: 15px; margin-top: 15px;">
         <h2>오늘의 기록 작성</h2>
         <textarea id="recordText" rows="3" placeholder="오늘 목표를 달성하셨나요? 소감을 남겨주세요."></textarea>
         
-        <!-- 이미지 업로드 -->
         <input type="file" id="recordImageInput" accept="image/*" onchange="previewImage(event)">
         <img id="imagePreview" class="image-preview" alt="미리보기">
 
         <button onclick="saveRecord()">오늘의 인증 완료하기</button>
       </section>
 
-      <!-- 오늘 기록 및 인증 사진 표시 -->
+      <!-- 기록 목록 -->
       <section style="padding: 15px; margin-top: 15px;">
         <h2>오늘의 기록 목록</h2>
         <div id="recordsList">등록된 기록이 없습니다.</div>
@@ -235,7 +221,38 @@
       records: []
     };
 
-    // UI SECTION TOGGLE (History API 반영하여 뒤로가기 버그 해결)
+    // 1. CUSTOM COLOR PICKER FUNCTION
+    function customThemeColor(hexColor) {
+      document.documentElement.style.setProperty('--primary', hexColor);
+      
+      // 조금 더 어두운 톤의 Hover 색상 자동 계산
+      const hoverColor = adjustColorBrightness(hexColor, -20);
+      document.documentElement.style.setProperty('--primary-hover', hoverColor);
+
+      // 브라우저 저장소에 선택 색상 보존
+      localStorage.setItem('customPrimaryColor', hexColor);
+    }
+
+    // 색상 어둡게 만들기 (Hover 효과용)
+    function adjustColorBrightness(hex, percent) {
+      let num = parseInt(hex.replace('#',''), 16),
+      amt = Math.round(2.55 * percent),
+      R = (num >> 16) + amt,
+      G = (num >> 8 & 0x00FF) + amt,
+      B = (num & 0x0000FF) + amt;
+      return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255)).toString(16).slice(1);
+    }
+
+    // 저장된 색상 불러오기
+    function loadSavedColor() {
+      const savedColor = localStorage.getItem('customPrimaryColor');
+      if (savedColor) {
+        document.getElementById('primaryColorPicker').value = savedColor;
+        customThemeColor(savedColor);
+      }
+    }
+
+    // UI SECTION TOGGLE
     function showSection(sectionId, pushHistory = true) {
       const sections = ['startSection', 'createSection', 'joinSection', 'inviteSection', 'dashboardSection'];
       sections.forEach(id => {
@@ -248,7 +265,7 @@
       }
     }
 
-    // 브라우저 뒤로가기/앞으로가기 처리 (뒤로 돌아가지 못하는 버그 해결)
+    // 뒤로가기 처리
     window.onpopstate = function(event) {
       if (event.state && event.state.section) {
         showSection(event.state.section, false);
@@ -257,12 +274,7 @@
       }
     };
 
-    // 1. UI CUSTOMIZATION (Theme Changer)
-    function changeTheme(themeName) {
-      document.documentElement.setAttribute('data-theme', themeName);
-    }
-
-    // 2. CREATE ROOM
+    // CREATE ROOM
     function handleCreateRoom() {
       const name = document.getElementById('createName').value.trim();
       const goal = document.getElementById('createGoal').value.trim();
@@ -285,7 +297,7 @@
     function copyInviteCode() {
       navigator.clipboard.writeText(state.roomCode);
       alert('초대코드가 복사되었습니다: ' + state.roomCode);
-      // 테스트용: 복사 후 바로 메인으로 진입하도록 시뮬레이션
+      
       setTimeout(() => {
         if(confirm('테스트: 상대방이 입장했다고 가정하고 챌린지를 시작할까요?')) {
           showSection('dashboardSection');
@@ -294,7 +306,7 @@
       }, 500);
     }
 
-    // 3. JOIN ROOM (상대방도 이름 및 목표 설정)
+    // JOIN ROOM
     function handleJoinRoom() {
       const code = document.getElementById('joinCode').value.trim();
       const name = document.getElementById('joinName').value.trim();
@@ -306,13 +318,13 @@
 
       state.roomCode = code;
       state.myInfo = { name, goal };
-      state.partnerInfo = { name: '방장', goal: '100일 완주하기' }; // 임시 파트너 정보
+      state.partnerInfo = { name: '방장', goal: '100일 완주하기' };
 
       showSection('dashboardSection');
       updateDashboard();
     }
 
-    // 4. PHOTO PREVIEW & RECORD SAVING
+    // PHOTO PREVIEW & RECORD SAVING
     let currentImageBase64 = null;
 
     function previewImage(event) {
@@ -342,7 +354,6 @@
 
       state.records.unshift(newRecord);
 
-      // Reset Inputs
       document.getElementById('recordText').value = '';
       document.getElementById('recordImageInput').value = '';
       document.getElementById('imagePreview').style.display = 'none';
@@ -370,7 +381,7 @@
       `).join('');
     }
 
-    // 5. PROFILE EDITING AFTER JOINING
+    // PROFILE EDIT
     function updateDashboard() {
       document.getElementById('myProfileName').innerText = state.myInfo.name;
       document.getElementById('myProfileGoal').innerText = state.myInfo.goal;
@@ -403,8 +414,9 @@
       alert('프로필이 수정되었습니다.');
     }
 
-    // 초기 실행
+    // 초기화
     window.onload = function() {
+      loadSavedColor();
       showSection('startSection', false);
     };
   </script>
