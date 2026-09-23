@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f7f3ed"><title>100 DAYS TOGETHER</title>
+<link rel="manifest" href="manifest.json"><link rel="stylesheet" href="style.css">
+</head>
+<body><div class="app">
+<header><div class="brand">🌱 100 DAYS TOGETHER</div><button id="leave" class="ghost" hidden>나가기</button></header>
+<main>
+<section id="welcome" class="card">
+<p class="eyebrow">100일 챌린지</p><h1>함께 100일을<br>달성해봐요.</h1>
+<p class="muted">방을 만들거나 친구의 초대코드로 참여하세요.</p>
+<div class="tabs"><button class="tab active" data-tab="create">방 만들기</button><button class="tab" data-tab="join">참여하기</button></div>
+<div id="createBox" class="form">
+<label>내 이름<input id="myName" maxlength="20" placeholder="이름"></label>
+<label>내 목표<input id="myGoal" maxlength="80" placeholder="예: 매일 영어 단어 30개"></label>
+<label>시작일<input id="startDate" type="date"></label>
+<button id="create" class="primary">방 만들기 🌱</button>
+</div>
+<div id="joinBox" class="form" hidden>
+<label>내 이름<input id="joinName" maxlength="20" placeholder="이름"></label>
+<label>초대코드<input id="roomCode" maxlength="6" placeholder="예: A7K2Q9" autocapitalize="characters"></label>
+<button id="join" class="primary">챌린지 참여하기</button>
+</div>
+</section>
+
+<section id="waiting" class="card" hidden>
+<p class="eyebrow">초대코드</p><h1 id="codeDisplay">------</h1>
+<p>친구에게 이 코드를 알려주세요.</p><button id="copyCode" class="primary">코드 복사</button>
+<div id="waitingText" class="muted" style="margin-top:14px">친구가 참여하면 챌린지가 시작됩니다.</div>
+</section>
+
+<section id="app" hidden>
+<div class="hero card"><p class="eyebrow">TOGETHER</p><h1>DAY <span id="dayNo">1</span> / 100</h1><div class="progress"><i id="dayProgress"></i></div><p id="dateText" class="muted"></p></div>
+<div class="people"><article id="person0" class="person card"></article><article id="person1" class="person card"></article></div>
+<section class="card"><div class="section-title"><h2>오늘의 기록</h2><span id="todayLabel"></span></div><div id="today"></div></section>
+<section class="card"><div class="section-title"><h2>100일 기록</h2><span class="muted">● 달성 · ○ 미달성</span></div><div id="calendar"></div></section>
+<section class="card"><div class="section-title"><h2>💌 오늘의 응원</h2><span class="muted">서로에게 한마디</span></div><div id="comments"></div></section>
+<section class="card"><h2>🏆 100일 요약</h2><div id="summary"></div></section>
+</section>
+</main></div>
+<script type="module" src="app.js"></script></body></html>
