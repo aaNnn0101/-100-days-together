@@ -81,6 +81,8 @@
     button:hover { background: var(--primary-hover); }
     button.secondary { background: transparent; color: var(--text-sub); border: 1px solid var(--border-color); }
     button.btn-small { width: auto; padding: 4px 10px; font-size: 0.8rem; margin: 0; }
+    button.btn-danger { background: var(--danger); }
+    button.btn-danger:hover { background: #c0392b; }
 
     .invite-code-box {
       font-size: 2rem; font-weight: bold; letter-spacing: 4px;
@@ -447,12 +449,12 @@
       const myName = window.appState.myInfo.name;
       const checks = window.appState.checks || [];
 
-      const hasChecked = checks.some(c => c.day === currentDay && c.author === myName);
+      const hasChecked = checks.some(c => Number(c.day) === currentDay && c.author === myName);
 
       let updatedChecks = [];
       if (hasChecked) {
         if (!confirm("오늘 인증을 취소하시겠습니까?")) return;
-        updatedChecks = checks.filter(c => !(c.day === currentDay && c.author === myName));
+        updatedChecks = checks.filter(c => !(Number(c.day) === currentDay && c.author === myName));
       } else {
         updatedChecks = [...checks, { day: currentDay, author: myName }];
       }
@@ -492,7 +494,7 @@
         
         // 상세 글을 남길 때 달력 체크가 아직 안 되어있다면 함께 체크
         const checks = window.appState.checks || [];
-        const hasChecked = checks.some(c => c.day === currentDay && c.author === window.appState.myInfo.name);
+        const hasChecked = checks.some(c => Number(c.day) === currentDay && c.author === window.appState.myInfo.name);
         let updateData = { records: arrayUnion(newRecord) };
         
         if (!hasChecked) {
@@ -515,7 +517,92 @@
     };
 
     // -------------------------------------------------------------
-    // 7. 댓글 작성 기능
+    // 7. 상세 기록 삭제 및 수정 기능
+    // -------------------------------------------------------------
+    window.deleteRecord = async function(recordId) {
+      if (!confirm("이 상세 기록을 정말 삭제하시겠습니까?")) return;
+
+      const records = window.appState.records || [];
+      const updatedRecords = records.filter(r => (r.id || r.timestamp) !== recordId);
+
+      try {
+        const roomRef = doc(db, "rooms", window.appState.roomCode);
+        await updateDoc(roomRef, { records: updatedRecords });
+      } catch (err) {
+        alert("기록 삭제 실패: " + err.message);
+      }
+    };
+
+    window.openEditRecordModal = function(recordId) {
+      const records = window.appState.records || [];
+      const target = records.find(r => (r.id || r.timestamp) === recordId);
+
+      if (!target) return alert("기록을 찾을 수 없습니다.");
+
+      window.currentEditingRecordId = recordId;
+      document.getElementById('editRecordText').value = target.text || '';
+      window.tempRecordPhoto = target.image || null;
+
+      const imgPreview = document.getElementById('editRecordPhotoPreview');
+      if (window.tempRecordPhoto) {
+        imgPreview.src = window.tempRecordPhoto;
+        imgPreview.style.display = 'block';
+      } else {
+        imgPreview.style.display = 'none';
+      }
+
+      document.getElementById('recordEditModal').classList.remove('hidden');
+    };
+
+    window.closeEditRecordModal = function() {
+      document.getElementById('recordEditModal').classList.add('hidden');
+      window.currentEditingRecordId = null;
+      window.tempRecordPhoto = null;
+    };
+
+    window.handleRecordPhotoChange = async function(event) {
+      const file = event.target.files[0];
+      if (file) {
+        window.tempRecordPhoto = await window.compressImage(file, 500, 0.7);
+        const imgPreview = document.getElementById('editRecordPhotoPreview');
+        imgPreview.src = window.tempRecordPhoto;
+        imgPreview.style.display = 'block';
+      }
+    };
+
+    window.removeRecordPhoto = function() {
+      window.tempRecordPhoto = null;
+      document.getElementById('editRecordPhotoPreview').style.display = 'none';
+      document.getElementById('editRecordPhotoInput').value = '';
+    };
+
+    window.saveEditedRecord = async function() {
+      const newText = document.getElementById('editRecordText').value.trim();
+      if (!newText && !window.tempRecordPhoto) return alert("내용이나 사진을 첨부해주세요.");
+
+      const records = window.appState.records || [];
+      const updatedRecords = records.map(r => {
+        if ((r.id || r.timestamp) === window.currentEditingRecordId) {
+          return {
+            ...r,
+            text: newText,
+            image: window.tempRecordPhoto
+          };
+        }
+        return r;
+      });
+
+      try {
+        const roomRef = doc(db, "rooms", window.appState.roomCode);
+        await updateDoc(roomRef, { records: updatedRecords });
+        closeEditRecordModal();
+      } catch (err) {
+        alert("기록 수정 실패: " + err.message);
+      }
+    };
+
+    // -------------------------------------------------------------
+    // 8. 댓글 작성 기능
     // -------------------------------------------------------------
     window.addComment = async function(recordId) {
       const inputEl = document.getElementById(`commentInput_${recordId}`);
@@ -546,15 +633,19 @@
       }
     };
 
-    // Helper 도우미 함수
+    // YYYY-MM-DD 날짜 차이 계산으로 안정적인 DAY 번호 추출
     function getCurrentDayNumber() {
       if (!window.appState.createdAt) return 1;
-      const start = new Date(window.appState.createdAt);
-      const now = new Date();
-      start.setHours(0, 0, 0, 0);
-      now.setHours(0, 0, 0, 0);
-      const diffTime = Math.abs(now - start);
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      
+      const startDate = new Date(window.appState.createdAt);
+      const nowDate = new Date();
+
+      const startUTC = Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+      const nowUTC = Date.UTC(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
+
+      const diffDays = Math.floor((nowUTC - startUTC) / (1000 * 60 * 60 * 24)) + 1;
+      
+      if (diffDays < 1) return 1;
       return diffDays > 100 ? 100 : diffDays;
     }
 
@@ -583,7 +674,7 @@
       renderAvatar('partnerAvatar', partnerInfo.photo, partnerInfo.name);
 
       const checks = window.appState.checks || [];
-      const hasCheckedToday = checks.some(c => c.day === currentDay && c.author === myInfo.name);
+      const hasCheckedToday = checks.some(c => Number(c.day) === currentDay && c.author === myInfo.name);
       const quickBtn = document.getElementById('quickCheckBtn');
       if (quickBtn) {
         if (hasCheckedToday) {
@@ -617,7 +708,7 @@
       const dayStats = {};
 
       checks.forEach(chk => {
-        const d = chk.day || 1;
+        const d = Number(chk.day) || 1;
         if (!dayStats[d]) dayStats[d] = new Set();
         dayStats[d].add(chk.author);
       });
@@ -671,7 +762,7 @@
       }
 
       // 선택한 날짜의 상세 기록만 필터링
-      const records = (window.appState.records || []).filter(r => r.day === window.appState.selectedDay);
+      const records = (window.appState.records || []).filter(r => Number(r.day) === window.appState.selectedDay);
       filterTitle.innerText = `DAY ${window.appState.selectedDay} 상세 기록 (${records.length}개)`;
       clearBtn.classList.remove('hidden');
 
@@ -680,9 +771,12 @@
         return;
       }
 
+      const myName = window.appState.myInfo.name;
+
       listContainer.innerHTML = records.slice().reverse().map(rec => {
         const recId = rec.id || rec.timestamp;
         const comments = rec.comments || [];
+        const isMyRecord = rec.author === myName;
         
         const commentsHtml = comments.map(c => `
           <div class="comment-item">
@@ -692,9 +786,15 @@
 
         return `
           <div style="background: var(--bg-color); padding: 12px; border-radius: 8px; margin-top: 10px;">
-            <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-sub);">
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; color:var(--text-sub);">
               <strong>${rec.author} <span style="font-weight:normal; color:var(--primary);">(DAY ${rec.day || 1})</span></strong>
-              <span>${rec.date}</span>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span>${rec.date}</span>
+                ${isMyRecord ? `
+                  <button type="button" class="secondary btn-small" onclick="openEditRecordModal('${recId}')">수정</button>
+                  <button type="button" class="secondary btn-small" style="color:var(--danger);" onclick="deleteRecord('${recId}')">삭제</button>
+                ` : ''}
+              </div>
             </div>
             ${rec.text ? `<p style="margin: 8px 0 0 0; color:var(--text-main);">${rec.text}</p>` : ''}
             ${rec.image ? `<img src="${rec.image}" class="record-img">` : ''}
@@ -868,9 +968,32 @@
     </div>
   </div>
 
+  <!-- 상세 기록 수정 모달 팝업 -->
+  <div id="recordEditModal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h2>상세 기록 수정</h2>
+      <div style="margin: 15px 0;">
+        <textarea id="editRecordText" rows="3" placeholder="내용을 입력해주세요."></textarea>
+        
+        <label style="font-size:0.85rem; color:var(--text-sub);">사진 변경</label>
+        <input type="file" id="editRecordPhotoInput" accept="image/*" onchange="handleRecordPhotoChange(event)" style="margin-top:5px;">
+        
+        <div style="position:relative; margin-top:10px;">
+          <img id="editRecordPhotoPreview" class="image-preview" style="width:100%; max-height:180px; object-fit:cover; border-radius:8px;" alt="미리보기">
+          <button type="button" class="secondary btn-small" onclick="removeRecordPhoto()" style="margin-top:5px;">사진 삭제</button>
+        </div>
+      </div>
+
+      <button type="button" onclick="saveEditedRecord()">수정완료</button>
+      <button type="button" class="secondary" onclick="closeEditRecordModal()">취소</button>
+    </div>
+  </div>
+
   <script>
     window.currentImageBase64 = null;
     window.tempProfilePhoto = null;
+    window.currentEditingRecordId = null;
+    window.tempRecordPhoto = null;
 
     // 상세 기록 이미지 첨부 시 압축 처리
     async function previewImage(event) {
