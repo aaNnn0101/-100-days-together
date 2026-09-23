@@ -13,6 +13,7 @@
       --text-sub: #7f8c8d;
       --primary: #2ecc71;
       --primary-hover: #27ae60;
+      --primary-light: #abebc6;
       --border-color: #e2e8f0;
       --shadow: 0 4px 15px rgba(0,0,0,0.05);
     }
@@ -91,6 +92,47 @@
       padding: 12px 15px; background: var(--bg-color); border-radius: 8px; margin-bottom: 10px;
     }
 
+    /* CALENDAR STYLES */
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 5px;
+      margin-top: 10px;
+      max-height: 250px;
+      overflow-y: auto;
+      padding-right: 5px;
+    }
+    .day-cell {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: bold;
+      border-radius: 6px;
+      background: var(--bg-color);
+      color: var(--text-sub);
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+    }
+    .day-cell:hover { border-color: var(--primary); }
+    .day-cell.today { border: 2px solid var(--primary); }
+    .day-cell.partial { background: var(--primary-light); color: var(--text-main); }
+    .day-cell.complete { background: var(--primary); color: white; }
+    .day-cell.selected { ring: 2px solid var(--text-main); transform: scale(1.05); }
+
+    .calendar-legend {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      font-size: 0.75rem;
+      color: var(--text-sub);
+      margin-top: 10px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 4px; }
+    .legend-box { width: 12px; height: 12px; border-radius: 3px; }
+
     .image-preview { width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; display: none; }
     .record-img { width: 100%; max-height: 250px; object-fit: cover; border-radius: 8px; margin-top: 10px; }
   </style>
@@ -123,7 +165,9 @@
       role: null,
       myInfo: { name: '', goal: '' },
       partnerInfo: { name: '상대방', goal: '대기 중...' },
-      records: []
+      createdAt: null,
+      records: [],
+      selectedDay: null // 필터링용 날짜 선택값
     };
 
     let unsubscribeRoom = null;
@@ -141,11 +185,8 @@
         try {
           window.appState = JSON.parse(saved);
           if (window.appState.roomCode) {
-            // 복원된 초대코드를 UI에 바로 표시
             const codeBox = document.getElementById('displayInviteCode');
             if (codeBox) codeBox.innerText = window.appState.roomCode;
-            
-            // 실시간 리스너 연결
             listenToRoom(window.appState.roomCode);
           }
         } catch(e) {
@@ -161,7 +202,7 @@
         roomCode: null, role: null,
         myInfo: { name: '', goal: '' },
         partnerInfo: { name: '상대방', goal: '대기 중...' },
-        records: []
+        createdAt: null, records: [], selectedDay: null
       };
       const codeBox = document.getElementById('displayInviteCode');
       if (codeBox) codeBox.innerText = "------";
@@ -185,9 +226,10 @@
         const data = snapshot.data();
         const role = window.appState.role;
 
-        // 화면 초대코드 복원 보장
         const codeBox = document.getElementById('displayInviteCode');
         if (codeBox && roomCode) codeBox.innerText = roomCode;
+
+        window.appState.createdAt = data.createdAt || new Date().toISOString();
 
         if (role === 'creator') {
           window.appState.myInfo = data.creator || { name: '', goal: '' };
@@ -221,17 +263,19 @@
       if (!name || !goal) return alert('이름과 목표를 입력해주세요.');
 
       const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const createdAt = new Date().toISOString();
 
       window.appState.roomCode = roomCode;
       window.appState.role = 'creator';
       window.appState.myInfo = { name, goal };
+      window.appState.createdAt = createdAt;
 
       document.getElementById('displayInviteCode').innerText = roomCode;
 
       try {
         await setDoc(doc(db, "rooms", roomCode), {
           roomCode: roomCode,
-          createdAt: new Date().toISOString(),
+          createdAt: createdAt,
           creator: { name, goal },
           joiner: null,
           records: []
@@ -289,10 +333,14 @@
       const text = document.getElementById('recordText').value.trim();
       if (!text && !window.currentImageBase64) return alert('내용이나 사진을 첨부해주세요.');
 
+      const currentDay = getCurrentDayNumber();
+
       const newRecord = {
         author: window.appState.myInfo.name,
         text: text,
         image: window.currentImageBase64 || null,
+        day: currentDay,
+        timestamp: new Date().toISOString(),
         date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
@@ -311,6 +359,18 @@
       }
     };
 
+    // 날짜 및 Day 계산 도우미
+    function getCurrentDayNumber() {
+      if (!window.appState.createdAt) return 1;
+      const start = new Date(window.appState.createdAt);
+      const now = new Date();
+      start.setHours(0, 0, 0, 0);
+      now.setHours(0, 0, 0, 0);
+      const diffTime = Math.abs(now - start);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      return diffDays > 100 ? 100 : diffDays;
+    }
+
     // UI Helper 함수
     window.showSection = function(sectionId) {
       const sections = ['startSection', 'createSection', 'joinSection', 'inviteSection', 'dashboardSection'];
@@ -323,26 +383,90 @@
     };
 
     window.updateDashboard = function() {
+      const currentDay = getCurrentDayNumber();
+      document.getElementById('currentDay').innerText = currentDay;
       document.getElementById('myProfileName').innerText = window.appState.myInfo.name || '나';
       document.getElementById('myProfileGoal').innerText = window.appState.myInfo.goal || '목표';
       document.getElementById('partnerProfileName').innerText = window.appState.partnerInfo.name || '상대방';
       document.getElementById('partnerProfileGoal').innerText = window.appState.partnerInfo.goal || '대기 중...';
+      
+      renderCalendar(currentDay);
+      renderRecords();
+    };
+
+    // 달력 렌더링 함수
+    function renderCalendar(currentDay) {
+      const calendarEl = document.getElementById('calendarGrid');
+      if (!calendarEl) return;
+
+      const records = window.appState.records || [];
+      const dayStats = {};
+
+      // 일차별 각 사용자별 달성 여부 집계
+      records.forEach(rec => {
+        const d = rec.day || 1;
+        if (!dayStats[d]) dayStats[d] = new Set();
+        dayStats[d].add(rec.author);
+      });
+
+      let html = '';
+      for (let i = 1; i <= 100; i++) {
+        const authors = dayStats[i] ? dayStats[i].size : 0;
+        let statusClass = '';
+        
+        if (authors >= 2) {
+          statusClass = 'complete'; // 2명 모두 완료
+        } else if (authors === 1) {
+          statusClass = 'partial';  // 1명 완료
+        }
+
+        if (i === currentDay) statusClass += ' today';
+        if (window.appState.selectedDay === i) statusClass += ' selected';
+
+        html += `<div class="day-cell ${statusClass}" onclick="filterByDay(${i})">${i}</div>`;
+      }
+      calendarEl.innerHTML = html;
+    }
+
+    window.filterByDay = function(day) {
+      if (window.appState.selectedDay === day) {
+        window.appState.selectedDay = null; // 필터 해제
+      } else {
+        window.appState.selectedDay = day;
+      }
+      renderCalendar(getCurrentDayNumber());
+      renderRecords();
+    };
+
+    window.clearDayFilter = function() {
+      window.appState.selectedDay = null;
+      renderCalendar(getCurrentDayNumber());
       renderRecords();
     };
 
     function renderRecords() {
       const listContainer = document.getElementById('recordsList');
-      const records = window.appState.records || [];
+      const filterTitle = document.getElementById('filterTitle');
+      let records = window.appState.records || [];
+
+      if (window.appState.selectedDay) {
+        records = records.filter(r => r.day === window.appState.selectedDay);
+        filterTitle.innerText = `DAY ${window.appState.selectedDay} 기록 (${records.length}개)`;
+        document.getElementById('clearFilterBtn').classList.remove('hidden');
+      } else {
+        filterTitle.innerText = '전체 기록 목록';
+        document.getElementById('clearFilterBtn').classList.add('hidden');
+      }
 
       if (records.length === 0) {
-        listContainer.innerHTML = '등록된 기록이 없습니다.';
+        listContainer.innerHTML = '<div style="color:var(--text-sub); font-size:0.9rem; padding: 10px 0;">등록된 기록이 없습니다.</div>';
         return;
       }
 
       listContainer.innerHTML = records.slice().reverse().map(rec => `
         <div style="background: var(--bg-color); padding: 12px; border-radius: 8px; margin-top: 10px;">
           <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-sub);">
-            <strong>${rec.author}</strong>
+            <strong>${rec.author} <span style="font-weight:normal; color:var(--primary);">(DAY ${rec.day || 1})</span></strong>
             <span>${rec.date}</span>
           </div>
           ${rec.text ? `<p style="margin: 8px 0 0 0; color:var(--text-main);">${rec.text}</p>` : ''}
@@ -436,6 +560,17 @@
         </div>
       </div>
 
+      <!-- 100일 달력 영역 -->
+      <section style="padding: 15px; margin-top: 15px;">
+        <h2>100일 달성 현황</h2>
+        <div class="calendar-grid" id="calendarGrid"></div>
+        <div class="calendar-legend">
+          <div class="legend-item"><div class="legend-box" style="background:var(--primary-light)"></div>1명 완료</div>
+          <div class="legend-item"><div class="legend-box" style="background:var(--primary)"></div>2명 완료</div>
+        </div>
+      </section>
+
+      <!-- 오늘의 기록 작성 -->
       <section style="padding: 15px; margin-top: 15px;">
         <h2>오늘의 기록 작성</h2>
         <form onsubmit="saveRecord(event)">
@@ -446,8 +581,12 @@
         </form>
       </section>
 
+      <!-- 기록 목록 -->
       <section style="padding: 15px; margin-top: 15px;">
-        <h2>오늘의 기록 목록</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h2 id="filterTitle">전체 기록 목록</h2>
+          <button type="button" id="clearFilterBtn" class="secondary hidden" onclick="clearDayFilter()" style="width:auto; padding:4px 10px; font-size:0.8rem; margin:0;">전체 보기</button>
+        </div>
         <div id="recordsList">등록된 기록이 없습니다.</div>
       </section>
 
@@ -481,7 +620,20 @@
 
     function customThemeColor(hexColor) {
       document.documentElement.style.setProperty('--primary', hexColor);
+      const hoverColor = adjustColorBrightness(hexColor, -20);
+      const lightColor = adjustColorBrightness(hexColor, 60);
+      document.documentElement.style.setProperty('--primary-hover', hoverColor);
+      document.documentElement.style.setProperty('--primary-light', lightColor);
       localStorage.setItem('customPrimaryColor', hexColor);
+    }
+
+    function adjustColorBrightness(hex, percent) {
+      let num = parseInt(hex.replace('#',''), 16),
+      amt = Math.round(2.55 * percent),
+      R = (num >> 16) + amt,
+      G = (num >> 8 & 0x00FF) + amt,
+      B = (num & 0x0000FF) + amt;
+      return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255)).toString(16).slice(1);
     }
 
     function loadSavedColor() {
