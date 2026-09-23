@@ -79,7 +79,6 @@
     button:hover { background: var(--primary-hover); }
     button.secondary { background: transparent; color: var(--text-sub); border: 1px solid var(--border-color); }
 
-    /* ========== SPECIFIC COMPONENTS ========== */
     .invite-code-box {
       font-size: 2rem; font-weight: bold; letter-spacing: 4px;
       text-align: center; color: var(--primary); padding: 15px;
@@ -93,23 +92,278 @@
     }
     .profile-card .edit-btn { width: auto; padding: 4px 12px; font-size: 0.8rem; margin-top: 0; }
 
-    /* Photo Upload Styling */
     .image-preview { width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; display: none; }
     .record-img { width: 100%; max-height: 250px; object-fit: cover; border-radius: 8px; margin-top: 10px; }
 
-    /* Modal styling for editing */
     .modal {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 100;
     }
     .modal-content { background: var(--card-bg); width: 90%; max-width: 400px; padding: 20px; border-radius: 12px; }
   </style>
+
+  <!-- Firebase SDK 모듈 로드 -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+      getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, arrayUnion 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // -------------------------------------------------------------
+    // Firebase 설정 (본인의 Firebase 키로 설정하세요)
+    // -------------------------------------------------------------
+    const firebaseConfig = {
+      apiKey: "AIzaSyA6-kgw6HncPlex2ENNIu2N1EObEwPcSZ0",
+      authDomain: "days-66f4e.firebaseapp.com",
+      projectId: "days-66f4e",
+      storageBucket: "days-66f4e.firebasestorage.app",
+      messagingSenderId: "197221374574",
+      appId: "1:197221374574:web:4c4300f0979113b587a47f"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // 전역 상태 변수
+    window.appState = {
+      roomCode: null,
+      role: null, // 'creator' 또는 'joiner'
+      myInfo: { name: '', goal: '' },
+      partnerInfo: { name: '상대방', goal: '대기 중...' },
+      records: []
+    };
+
+    let unsubscribeRoom = null;
+
+    // -------------------------------------------------------------
+    // 1. 세션 저장 및 복원 (나가도 화면 유지되도록 함)
+    // -------------------------------------------------------------
+    function saveSession() {
+      localStorage.setItem('challenge_session', JSON.stringify(window.appState));
+    }
+
+    function loadSession() {
+      const saved = localStorage.getItem('challenge_session');
+      if (saved) {
+        try {
+          window.appState = JSON.parse(saved);
+          if (window.appState.roomCode) {
+            // 이미 방에 참여 중인 경우 실시간 데이터 수신 시작
+            listenToRoom(window.appState.roomCode);
+          }
+        } catch(e) {
+          console.error("세션 복원 실패", e);
+        }
+      }
+    }
+
+    window.resetSession = function() {
+      localStorage.removeItem('challenge_session');
+      if (unsubscribeRoom) unsubscribeRoom();
+      window.appState = {
+        roomCode: null, role: null,
+        myInfo: { name: '', goal: '' },
+        partnerInfo: { name: '상대방', goal: '대기 중...' },
+        records: []
+      };
+      showSection('startSection');
+    };
+
+    // -------------------------------------------------------------
+    // 2. FIRESTORE 실시간 동기화
+    // -------------------------------------------------------------
+    function listenToRoom(roomCode) {
+      if (unsubscribeRoom) unsubscribeRoom();
+
+      const roomRef = doc(db, "rooms", roomCode);
+      unsubscribeRoom = onSnapshot(roomRef, (snapshot) => {
+        if (!snapshot.exists()) {
+          alert('존재하지 않거나 삭제된 방입니다.');
+          window.resetSession();
+          return;
+        }
+
+        const data = snapshot.data();
+        const role = window.appState.role;
+
+        if (role === 'creator') {
+          window.appState.myInfo = data.creator || { name: '', goal: '' };
+          if (data.joiner) {
+            window.appState.partnerInfo = data.joiner;
+            // 상대방이 들어왔으면 자동으로 메인 화면으로 이동!
+            showSection('dashboardSection');
+          } else {
+            window.appState.partnerInfo = { name: '상대방', goal: '대기 중...' };
+            showSection('inviteSection');
+          }
+        } else if (role === 'joiner') {
+          window.appState.myInfo = data.joiner || { name: '', goal: '' };
+          window.appState.partnerInfo = data.creator || { name: '방장', goal: '' };
+          showSection('dashboardSection');
+        }
+
+        window.appState.records = data.records || [];
+        updateDashboard();
+        saveSession();
+      });
+    }
+
+    // -------------------------------------------------------------
+    // 3. 방 만들기
+    // -------------------------------------------------------------
+    window.handleCreateRoom = async function(e) {
+      if (e) e.preventDefault();
+      
+      const name = document.getElementById('createName').value.trim();
+      const goal = document.getElementById('createGoal').value.trim();
+      if (!name || !goal) return alert('이름과 목표를 입력해주세요.');
+
+      // 6자리 방 코드 생성
+      const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+      window.appState.roomCode = roomCode;
+      window.appState.role = 'creator';
+      window.appState.myInfo = { name, goal };
+
+      document.getElementById('displayInviteCode').innerText = roomCode;
+
+      try {
+        await setDoc(doc(db, "rooms", roomCode), {
+          roomCode: roomCode,
+          createdAt: new Date().toISOString(),
+          creator: { name, goal },
+          joiner: null,
+          records: []
+        });
+
+        saveSession();
+        listenToRoom(roomCode);
+        showSection('inviteSection');
+      } catch (err) {
+        alert("방 생성 실패: " + err.message);
+      }
+    };
+
+    // -------------------------------------------------------------
+    // 4. 방 참여하기
+    // -------------------------------------------------------------
+    window.handleJoinRoom = async function(e) {
+      if (e) e.preventDefault();
+
+      const code = document.getElementById('joinCode').value.trim().toUpperCase();
+      const name = document.getElementById('joinName').value.trim();
+      const goal = document.getElementById('joinGoal').value.trim();
+
+      if (!code || !name || !goal) return alert('모든 항목을 입력해주세요.');
+
+      const roomRef = doc(db, "rooms", code);
+      const roomSnap = await getDoc(roomRef);
+
+      if (!roomSnap.exists()) {
+        return alert('유효하지 않은 초대코드입니다. 코드를 다시 확인해주세요.');
+      }
+
+      window.appState.roomCode = code;
+      window.appState.role = 'joiner';
+      window.appState.myInfo = { name, goal };
+
+      try {
+        await updateDoc(roomRef, {
+          joiner: { name, goal }
+        });
+
+        saveSession();
+        listenToRoom(code);
+      } catch (err) {
+        alert("방 참여 실패: " + err.message);
+      }
+    };
+
+    // -------------------------------------------------------------
+    // 5. 인증 기록 저장
+    // -------------------------------------------------------------
+    window.saveRecord = async function(e) {
+      if (e) e.preventDefault();
+
+      const text = document.getElementById('recordText').value.trim();
+      if (!text && !window.currentImageBase64) return alert('내용이나 사진을 첨부해주세요.');
+
+      const newRecord = {
+        author: window.appState.myInfo.name,
+        text: text,
+        image: window.currentImageBase64 || null,
+        date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      try {
+        const roomRef = doc(db, "rooms", window.appState.roomCode);
+        await updateDoc(roomRef, {
+          records: arrayUnion(newRecord)
+        });
+
+        document.getElementById('recordText').value = '';
+        document.getElementById('recordImageInput').value = '';
+        document.getElementById('imagePreview').style.display = 'none';
+        window.currentImageBase64 = null;
+      } catch (err) {
+        alert("기록 저장 실패: " + err.message);
+      }
+    };
+
+    // UI Helper 함수
+    window.showSection = function(sectionId) {
+      const sections = ['startSection', 'createSection', 'joinSection', 'inviteSection', 'dashboardSection'];
+      sections.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+      });
+      const target = document.getElementById(sectionId);
+      if (target) target.classList.remove('hidden');
+    };
+
+    window.updateDashboard = function() {
+      document.getElementById('myProfileName').innerText = window.appState.myInfo.name || '나';
+      document.getElementById('myProfileGoal').innerText = window.appState.myInfo.goal || '목표';
+      document.getElementById('partnerProfileName').innerText = window.appState.partnerInfo.name || '상대방';
+      document.getElementById('partnerProfileGoal').innerText = window.appState.partnerInfo.goal || '대기 중...';
+      renderRecords();
+    };
+
+    function renderRecords() {
+      const listContainer = document.getElementById('recordsList');
+      const records = window.appState.records || [];
+
+      if (records.length === 0) {
+        listContainer.innerHTML = '등록된 기록이 없습니다.';
+        return;
+      }
+
+      listContainer.innerHTML = records.slice().reverse().map(rec => `
+        <div style="background: var(--bg-color); padding: 12px; border-radius: 8px; margin-top: 10px;">
+          <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-sub);">
+            <strong>${rec.author}</strong>
+            <span>${rec.date}</span>
+          </div>
+          ${rec.text ? `<p style="margin: 8px 0 0 0; color:var(--text-main);">${rec.text}</p>` : ''}
+          ${rec.image ? `<img src="${rec.image}" class="record-img">` : ''}
+        </div>
+      `).join('');
+    }
+
+    // 초기 실행 로직
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSavedColor();
+      loadSession();
+      if (!window.appState.roomCode) {
+        showSection('startSection');
+      }
+    });
+  </script>
 </head>
 <body>
 
   <header>
     <div class="logo">100 DAYS TOGETHER</div>
-    
     <div class="color-picker-wrapper">
       <span>테마 색상</span>
       <input type="color" id="primaryColorPicker" value="#2ecc71" oninput="customThemeColor(this.value)">
@@ -139,7 +393,7 @@
       </form>
     </section>
 
-    <!-- 3. JOIN ROOM SECTION (초기화 방지 적용) -->
+    <!-- 3. JOIN ROOM SECTION -->
     <section id="joinSection" class="hidden">
       <h1>챌린지 참여하기</h1>
       <p>초대코드를 입력하고 본인의 정보를 설정하세요.</p>
@@ -156,9 +410,9 @@
     <section id="inviteSection" class="hidden">
       <p>초대코드</p>
       <div class="invite-code-box" id="displayInviteCode">------</div>
-      <p>친구에게 이 코드를 알려주세요. 친구가 참여하면 챌린지가 시작됩니다.</p>
+      <p>친구에게 이 코드를 알려주세요. 친구가 참여하면 화면이 자동으로 전환됩니다.</p>
       <button type="button" onclick="copyInviteCode()">코드 복사하기</button>
-      <button type="button" class="secondary" onclick="cancelWaiting()">뒤로 가기 (방 대기 취소)</button>
+      <button type="button" class="secondary" onclick="resetSession()">방 삭제 및 처음으로</button>
     </section>
 
     <!-- 5. MAIN DASHBOARD SECTION -->
@@ -168,13 +422,11 @@
         <h1>DAY <span id="currentDay">1</span> / 100</h1>
       </div>
 
-      <!-- 프로필 영역 -->
       <div style="margin: 15px 0;">
         <div class="profile-card">
           <div>
             <strong id="myProfileName">나</strong>: <span id="myProfileGoal">목표</span>
           </div>
-          <button type="button" class="edit-btn" onclick="openEditModal()">수정</button>
         </div>
         <div class="profile-card">
           <div>
@@ -183,7 +435,6 @@
         </div>
       </div>
 
-      <!-- 오늘의 기록 작성 -->
       <section style="padding: 15px; margin-top: 15px;">
         <h2>오늘의 기록 작성</h2>
         <form onsubmit="saveRecord(event)">
@@ -194,63 +445,42 @@
         </form>
       </section>
 
-      <!-- 기록 목록 -->
       <section style="padding: 15px; margin-top: 15px;">
         <h2>오늘의 기록 목록</h2>
         <div id="recordsList">등록된 기록이 없습니다.</div>
       </section>
+      
+      <button type="button" class="secondary" onclick="resetSession()" style="margin-top:20px;">나가기 / 초기화</button>
     </section>
-
-    <!-- EDIT PROFILE MODAL -->
-    <div id="editModal" class="modal hidden">
-      <div class="modal-content">
-        <h2>프로필 수정</h2>
-        <p style="margin-bottom:10px;">이름과 목표를 변경할 수 있습니다.</p>
-        <form onsubmit="saveProfileEdit(event)">
-          <input type="text" id="editName" placeholder="새로운 이름">
-          <input type="text" id="editGoal" placeholder="새로운 목표">
-          <button type="submit">저장</button>
-          <button type="button" class="secondary" onclick="closeEditModal()">취소</button>
-        </form>
-      </div>
-    </div>
   </main>
 
   <script>
-    let state = {
-      roomCode: null,
-      myInfo: { name: '', goal: '' },
-      partnerInfo: { name: '상대방', goal: '대기 중...' },
-      records: []
-    };
+    // 일반 스크립트 도우미 함수
+    window.currentImageBase64 = null;
 
-    // UI 화면 전환 (새로고침 방지 적용)
-    function showSection(sectionId) {
-      const sections = ['startSection', 'createSection', 'joinSection', 'inviteSection', 'dashboardSection'];
-      sections.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.classList.add('hidden');
-      });
-      
-      const target = document.getElementById(sectionId);
-      if (target) target.classList.remove('hidden');
+    function previewImage(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          window.currentImageBase64 = e.target.result;
+          const imgEl = document.getElementById('imagePreview');
+          imgEl.src = window.currentImageBase64;
+          imgEl.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
     }
 
-    // 테마 변경 기능
+    function copyInviteCode() {
+      const code = document.getElementById('displayInviteCode').innerText;
+      navigator.clipboard.writeText(code);
+      alert('초대코드가 복사되었습니다: ' + code);
+    }
+
     function customThemeColor(hexColor) {
       document.documentElement.style.setProperty('--primary', hexColor);
-      const hoverColor = adjustColorBrightness(hexColor, -20);
-      document.documentElement.style.setProperty('--primary-hover', hoverColor);
       localStorage.setItem('customPrimaryColor', hexColor);
-    }
-
-    function adjustColorBrightness(hex, percent) {
-      let num = parseInt(hex.replace('#',''), 16),
-      amt = Math.round(2.55 * percent),
-      R = (num >> 16) + amt,
-      G = (num >> 8 & 0x00FF) + amt,
-      B = (num & 0x0000FF) + amt;
-      return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255)).toString(16).slice(1);
     }
 
     function loadSavedColor() {
@@ -260,160 +490,6 @@
         customThemeColor(savedColor);
       }
     }
-
-    // 방 만들기 (새로고침 방지)
-    function handleCreateRoom(e) {
-      if (e) e.preventDefault();
-      
-      const name = document.getElementById('createName').value.trim();
-      const goal = document.getElementById('createGoal').value.trim();
-
-      if (!name || !goal) return alert('이름과 목표를 모두 입력해주세요.');
-
-      state.myInfo = { name, goal };
-      state.roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-
-      document.getElementById('displayInviteCode').innerText = state.roomCode;
-      showSection('inviteSection');
-    }
-
-    function cancelWaiting() {
-      if (confirm('방 생성을 취소하고 처음으로 돌아가시겠습니까?')) {
-        showSection('startSection');
-      }
-    }
-
-    function copyInviteCode() {
-      navigator.clipboard.writeText(state.roomCode);
-      alert('초대코드가 복사되었습니다: ' + state.roomCode);
-      
-      setTimeout(() => {
-        if(confirm('테스트: 상대방이 입장했다고 가정하고 챌린지를 시작할까요?')) {
-          showSection('dashboardSection');
-          updateDashboard();
-        }
-      }, 300);
-    }
-
-    // 챌린지 참여하기 (초기화 버그 해결 핵심 함수)
-    function handleJoinRoom(e) {
-      if (e) e.preventDefault(); // 새로고침 현상 원천 차단
-      
-      const code = document.getElementById('joinCode').value.trim();
-      const name = document.getElementById('joinName').value.trim();
-      const goal = document.getElementById('joinGoal').value.trim();
-
-      if (!code || !name || !goal) {
-        return alert('초대코드, 이름, 목표를 모두 입력해주세요.');
-      }
-
-      state.roomCode = code;
-      state.myInfo = { name, goal };
-      state.partnerInfo = { name: '방장', goal: '100일 완주하기' };
-
-      showSection('dashboardSection');
-      updateDashboard();
-    }
-
-    // 사진 프리뷰 및 저장
-    let currentImageBase64 = null;
-
-    function previewImage(event) {
-      const file = event.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          currentImageBase64 = e.target.result;
-          const imgEl = document.getElementById('imagePreview');
-          imgEl.src = currentImageBase64;
-          imgEl.style.display = 'block';
-        };
-        reader.readAsDataURL(file);
-      }
-    }
-
-    function saveRecord(e) {
-      if (e) e.preventDefault();
-      
-      const text = document.getElementById('recordText').value.trim();
-      if (!text && !currentImageBase64) return alert('내용 또는 인증 사진을 입력해주세요.');
-
-      const newRecord = {
-        author: state.myInfo.name,
-        text: text,
-        image: currentImageBase64,
-        date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-
-      state.records.unshift(newRecord);
-
-      document.getElementById('recordText').value = '';
-      document.getElementById('recordImageInput').value = '';
-      document.getElementById('imagePreview').style.display = 'none';
-      currentImageBase64 = null;
-
-      renderRecords();
-    }
-
-    function renderRecords() {
-      const listContainer = document.getElementById('recordsList');
-      if (state.records.length === 0) {
-        listContainer.innerHTML = '등록된 기록이 없습니다.';
-        return;
-      }
-
-      listContainer.innerHTML = state.records.map(rec => `
-        <div style="background: var(--bg-color); padding: 12px; border-radius: 8px; margin-top: 10px;">
-          <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-sub);">
-            <strong>${rec.author}</strong>
-            <span>${rec.date}</span>
-          </div>
-          ${rec.text ? `<p style="margin: 8px 0 0 0; color:var(--text-main);">${rec.text}</p>` : ''}
-          ${rec.image ? `<img src="${rec.image}" class="record-img">` : ''}
-        </div>
-      `).join('');
-    }
-
-    // 프로필 수정
-    function updateDashboard() {
-      document.getElementById('myProfileName').innerText = state.myInfo.name;
-      document.getElementById('myProfileGoal').innerText = state.myInfo.goal;
-      document.getElementById('partnerProfileName').innerText = state.partnerInfo.name;
-      document.getElementById('partnerProfileGoal').innerText = state.partnerInfo.goal;
-      renderRecords();
-    }
-
-    function openEditModal() {
-      document.getElementById('editName').value = state.myInfo.name;
-      document.getElementById('editGoal').value = state.myInfo.goal;
-      document.getElementById('editModal').classList.remove('hidden');
-    }
-
-    function closeEditModal() {
-      document.getElementById('editModal').classList.add('hidden');
-    }
-
-    function saveProfileEdit(e) {
-      if (e) e.preventDefault();
-      
-      const newName = document.getElementById('editName').value.trim();
-      const newGoal = document.getElementById('editGoal').value.trim();
-
-      if (!newName || !newGoal) return alert('이름과 목표를 모두 입력해 주세요.');
-
-      state.myInfo.name = newName;
-      state.myInfo.goal = newGoal;
-
-      updateDashboard();
-      closeEditModal();
-      alert('프로필이 수정되었습니다.');
-    }
-
-    // 초기 실행
-    window.onload = function() {
-      loadSavedColor();
-      showSection('startSection');
-    };
   </script>
 </body>
 </html>
