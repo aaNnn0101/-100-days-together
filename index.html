@@ -1,43 +1,412 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#f7f3ed"><title>100 DAYS TOGETHER</title>
-<link rel="manifest" href="manifest.json"><link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🌱 100 DAYS TOGETHER</title>
+  <style>
+    /* ========== CSS VARIABLES & THEMES ========== */
+    :root {
+      --bg-color: #f4f7f6;
+      --card-bg: #ffffff;
+      --text-main: #2c3e50;
+      --text-sub: #7f8c8d;
+      --primary: #2ecc71;
+      --primary-hover: #27ae60;
+      --border-color: #e2e8f0;
+      --shadow: 0 4px 15px rgba(0,0,0,0.05);
+    }
+
+    [data-theme="pink"] {
+      --bg-color: #fff0f5;
+      --card-bg: #ffffff;
+      --text-main: #4a2e35;
+      --text-sub: #9e7381;
+      --primary: #ff6b81;
+      --primary-hover: #ff4757;
+      --border-color: #f8d7da;
+    }
+
+    [data-theme="dark"] {
+      --bg-color: #1a1a2e;
+      --card-bg: #16213e;
+      --text-main: #e9ecef;
+      --text-sub: #a0aec0;
+      --primary: #0f3460;
+      --primary-hover: #1e56a0;
+      --border-color: #2a2a40;
+    }
+
+    [data-theme="blue"] {
+      --bg-color: #f0f8ff;
+      --card-bg: #ffffff;
+      --text-main: #1e3a8a;
+      --text-sub: #64748b;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --border-color: #dbeafe;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text-main); transition: all 0.3s ease; padding-bottom: 50px; }
+
+    /* ========== HEADER & THEME SELECTOR ========== */
+    header {
+      background: var(--card-bg);
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      box-shadow: var(--shadow);
+    }
+    .logo { font-size: 1.2rem; font-weight: bold; color: var(--primary); }
+    .theme-selector select {
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: var(--card-bg);
+      color: var(--text-main);
+      cursor: pointer;
+    }
+
+    /* ========== CONTAINER & CARDS ========== */
+    main { max-width: 500px; margin: 20px auto; padding: 0 15px; }
+    section { background: var(--card-bg); border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: var(--shadow); border: 1px solid var(--border-color); }
+    .hidden { display: none !important; }
+
+    h1 { font-size: 1.6rem; margin-bottom: 10px; line-height: 1.3; }
+    p { color: var(--text-sub); font-size: 0.95rem; margin-bottom: 15px; }
+
+    input[type="text"], textarea {
+      width: 100%; padding: 12px; margin-bottom: 10px;
+      border: 1px solid var(--border-color); border-radius: 8px;
+      background: var(--bg-color); color: var(--text-main); font-size: 0.95rem;
+    }
+
+    button {
+      width: 100%; padding: 12px; border: none; border-radius: 8px;
+      background: var(--primary); color: white; font-weight: bold; font-size: 1rem;
+      cursor: pointer; transition: 0.2s ease; margin-top: 5px;
+    }
+    button:hover { background: var(--primary-hover); }
+    button.secondary { background: transparent; color: var(--text-sub); border: 1px solid var(--border-color); }
+
+    /* ========== SPECIFIC COMPONENTS ========== */
+    .invite-code-box {
+      font-size: 2rem; font-weight: bold; letter-spacing: 4px;
+      text-align: center; color: var(--primary); padding: 15px;
+      background: var(--bg-color); border-radius: 8px; margin: 15px 0;
+    }
+
+    .profile-card {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px; background: var(--bg-color); border-radius: 8px; margin-bottom: 10px;
+    }
+    .profile-card .edit-btn { width: auto; padding: 4px 10px; font-size: 0.8rem; }
+
+    /* Photo Upload Styling */
+    .image-preview { width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; display: none; }
+    .record-img { width: 100%; max-height: 250px; object-fit: cover; border-radius: 8px; margin-top: 10px; }
+
+    /* Modal styling for editing */
+    .modal {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 100;
+    }
+    .modal-content { background: var(--card-bg); width: 90%; max-width: 400px; padding: 20px; border-radius: 12px; }
+  </style>
 </head>
-<body><div class="app">
-<header><div class="brand">🌱 100 DAYS TOGETHER</div><button id="leave" class="ghost" hidden>나가기</button></header>
-<main>
-<section id="welcome" class="card">
-<p class="eyebrow">100일 챌린지</p><h1>함께 100일을<br>달성해봐요.</h1>
-<p class="muted">방을 만들거나 친구의 초대코드로 참여하세요.</p>
-<div class="tabs"><button class="tab active" data-tab="create">방 만들기</button><button class="tab" data-tab="join">참여하기</button></div>
-<div id="createBox" class="form">
-<label>내 이름<input id="myName" maxlength="20" placeholder="이름"></label>
-<label>내 목표<input id="myGoal" maxlength="80" placeholder="예: 매일 영어 단어 30개"></label>
-<label>시작일<input id="startDate" type="date"></label>
-<button id="create" class="primary">방 만들기 🌱</button>
-</div>
-<div id="joinBox" class="form" hidden>
-<label>내 이름<input id="joinName" maxlength="20" placeholder="이름"></label>
-<label>초대코드<input id="roomCode" maxlength="6" placeholder="예: A7K2Q9" autocapitalize="characters"></label>
-<button id="join" class="primary">챌린지 참여하기</button>
-</div>
-</section>
+<body>
 
-<section id="waiting" class="card" hidden>
-<p class="eyebrow">초대코드</p><h1 id="codeDisplay">------</h1>
-<p>친구에게 이 코드를 알려주세요.</p><button id="copyCode" class="primary">코드 복사</button>
-<div id="waitingText" class="muted" style="margin-top:14px">친구가 참여하면 챌린지가 시작됩니다.</div>
-</section>
+  <header>
+    <div class="logo">🌱 100 DAYS TOGETHER</div>
+    <div class="theme-selector">
+      <select id="themeSelect" onchange="changeTheme(this.value)">
+        <option value="default">🌱 Green</option>
+        <option value="pink">🌸 Pink</option>
+        <option value="dark">🌙 Dark</option>
+        <option value="blue">🌊 Blue</option>
+      </select>
+    </div>
+  </header>
 
-<section id="app" hidden>
-<div class="hero card"><p class="eyebrow">TOGETHER</p><h1>DAY <span id="dayNo">1</span> / 100</h1><div class="progress"><i id="dayProgress"></i></div><p id="dateText" class="muted"></p></div>
-<div class="people"><article id="person0" class="person card"></article><article id="person1" class="person card"></article></div>
-<section class="card"><div class="section-title"><h2>오늘의 기록</h2><span id="todayLabel"></span></div><div id="today"></div></section>
-<section class="card"><div class="section-title"><h2>100일 기록</h2><span class="muted">● 달성 · ○ 미달성</span></div><div id="calendar"></div></section>
-<section class="card"><div class="section-title"><h2>💌 오늘의 응원</h2><span class="muted">서로에게 한마디</span></div><div id="comments"></div></section>
-<section class="card"><h2>🏆 100일 요약</h2><div id="summary"></div></section>
-</section>
-</main></div>
-<script type="module" src="app.js"></script></body></html>
+  <main>
+    <!-- 1. START SECTION (방 만들기 / 입장하기 선택) -->
+    <section id="startSection">
+      <p>100일 챌린지</p>
+      <h1>함께 100일을<br>달성해봐요.</h1>
+      <p>방을 만들거나 친구의 초대코드로 참여하세요.</p>
+      
+      <button onclick="showSection('createSection')">새로운 방 만들기</button>
+      <button class="secondary" onclick="showSection('joinSection')">초대코드로 참여하기</button>
+    </section>
+
+    <!-- 2. CREATE ROOM SECTION -->
+    <section id="createSection" class="hidden">
+      <h1>방 만들기</h1>
+      <p>나의 이름과 목표를 설정하세요.</p>
+      <input type="text" id="createName" placeholder="이름 (예: 홍길동)">
+      <input type="text" id="createGoal" placeholder="목표 (예: 매일 영단어 10개 외우기)">
+      <button onclick="handleCreateRoom()">초대코드 생성하기</button>
+      <button class="secondary" onclick="showSection('startSection')">취소</button>
+    </section>
+
+    <!-- 3. JOIN ROOM SECTION (상대방도 이름/목표 설정 가능) -->
+    <section id="joinSection" class="hidden">
+      <h1>챌린지 참여하기</h1>
+      <p>초대코드를 입력하고 본인의 정보를 설정하세요.</p>
+      <input type="text" id="joinCode" placeholder="초대코드 6자리 입력">
+      <input type="text" id="joinName" placeholder="내 이름 (예: 김철수)">
+      <input type="text" id="joinGoal" placeholder="내 목표 (예: 매일 30분 운동하기)">
+      <button onclick="handleJoinRoom()">참여하기</button>
+      <button class="secondary" onclick="showSection('startSection')">취소</button>
+    </section>
+
+    <!-- 4. INVITE CODE WAITING SECTION (버그 수정: 뒤로가기 지원) -->
+    <section id="inviteSection" class="hidden">
+      <p>초대코드</p>
+      <div class="invite-code-box" id="displayInviteCode">------</div>
+      <p>친구에게 이 코드를 알려주세요. 친구가 참여하면 챌린지가 시작됩니다.</p>
+      <button onclick="copyInviteCode()">코드 복사하기</button>
+      <button class="secondary" onclick="cancelWaiting()">뒤로 가기 (방 대기 취소)</button>
+    </section>
+
+    <!-- 5. MAIN DASHBOARD SECTION -->
+    <section id="dashboardSection" class="hidden">
+      <div>
+        <p>TOGETHER</p>
+        <h1>DAY <span id="currentDay">1</span> / 100</h1>
+      </div>
+
+      <!-- 내 프로필 & 상대방 프로필 -->
+      <div style="margin: 15px 0;">
+        <div class="profile-card">
+          <div>
+            <strong id="myProfileName">나</strong>: <span id="myProfileGoal">목표</span>
+          </div>
+          <button class="edit-btn" onclick="openEditModal()">✏️ 수정</button>
+        </div>
+        <div class="profile-card">
+          <div>
+            <strong id="partnerProfileName">상대방</strong>: <span id="partnerProfileGoal">목표</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 오늘의 기록 작성 (사진 기능 추가) -->
+      <section style="padding: 15px; margin-top: 15px;">
+        <h2>오늘의 기록 작성</h2>
+        <textarea id="recordText" rows="3" placeholder="오늘 목표를 달성하셨나요? 소감을 남겨주세요."></textarea>
+        
+        <!-- 이미지 업로드 -->
+        <input type="file" id="recordImageInput" accept="image/*" onchange="previewImage(event)">
+        <img id="imagePreview" class="image-preview" alt="미리보기">
+
+        <button onclick="saveRecord()">오늘의 인증 완료하기</button>
+      </section>
+
+      <!-- 오늘 기록 및 인증 사진 표시 -->
+      <section style="padding: 15px; margin-top: 15px;">
+        <h2>오늘의 기록 목록</h2>
+        <div id="recordsList">등록된 기록이 없습니다.</div>
+      </section>
+    </section>
+
+    <!-- EDIT PROFILE MODAL -->
+    <div id="editModal" class="modal hidden">
+      <div class="modal-content">
+        <h2>프로필 수정</h2>
+        <p style="margin-bottom:10px;">이름과 목표를 변경할 수 있습니다.</p>
+        <input type="text" id="editName" placeholder="새로운 이름">
+        <input type="text" id="editGoal" placeholder="새로운 목표">
+        <button onclick="saveProfileEdit()">저장</button>
+        <button class="secondary" onclick="closeEditModal()">취소</button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // State management
+    let state = {
+      roomCode: null,
+      myInfo: { name: '', goal: '' },
+      partnerInfo: { name: '상대방', goal: '대기 중...' },
+      records: []
+    };
+
+    // UI SECTION TOGGLE (History API 반영하여 뒤로가기 버그 해결)
+    function showSection(sectionId, pushHistory = true) {
+      const sections = ['startSection', 'createSection', 'joinSection', 'inviteSection', 'dashboardSection'];
+      sections.forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+      document.getElementById(sectionId).classList.remove('hidden');
+
+      if (pushHistory) {
+        history.pushState({ section: sectionId }, '', `#${sectionId}`);
+      }
+    }
+
+    // 브라우저 뒤로가기/앞으로가기 처리 (뒤로 돌아가지 못하는 버그 해결)
+    window.onpopstate = function(event) {
+      if (event.state && event.state.section) {
+        showSection(event.state.section, false);
+      } else {
+        showSection('startSection', false);
+      }
+    };
+
+    // 1. UI CUSTOMIZATION (Theme Changer)
+    function changeTheme(themeName) {
+      document.documentElement.setAttribute('data-theme', themeName);
+    }
+
+    // 2. CREATE ROOM
+    function handleCreateRoom() {
+      const name = document.getElementById('createName').value.trim();
+      const goal = document.getElementById('createGoal').value.trim();
+
+      if (!name || !goal) return alert('이름과 목표를 모두 입력해주세요.');
+
+      state.myInfo = { name, goal };
+      state.roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+      document.getElementById('displayInviteCode').innerText = state.roomCode;
+      showSection('inviteSection');
+    }
+
+    function cancelWaiting() {
+      if (confirm('방 생성을 취소하고 처음으로 돌아가시겠습니까?')) {
+        showSection('startSection');
+      }
+    }
+
+    function copyInviteCode() {
+      navigator.clipboard.writeText(state.roomCode);
+      alert('초대코드가 복사되었습니다: ' + state.roomCode);
+      // 테스트용: 복사 후 바로 메인으로 진입하도록 시뮬레이션
+      setTimeout(() => {
+        if(confirm('테스트: 상대방이 입장했다고 가정하고 챌린지를 시작할까요?')) {
+          showSection('dashboardSection');
+          updateDashboard();
+        }
+      }, 500);
+    }
+
+    // 3. JOIN ROOM (상대방도 이름 및 목표 설정)
+    function handleJoinRoom() {
+      const code = document.getElementById('joinCode').value.trim();
+      const name = document.getElementById('joinName').value.trim();
+      const goal = document.getElementById('joinGoal').value.trim();
+
+      if (!code || !name || !goal) {
+        return alert('초대코드, 이름, 목표를 모두 입력해주세요.');
+      }
+
+      state.roomCode = code;
+      state.myInfo = { name, goal };
+      state.partnerInfo = { name: '방장', goal: '100일 완주하기' }; // 임시 파트너 정보
+
+      showSection('dashboardSection');
+      updateDashboard();
+    }
+
+    // 4. PHOTO PREVIEW & RECORD SAVING
+    let currentImageBase64 = null;
+
+    function previewImage(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          currentImageBase64 = e.target.result;
+          const imgEl = document.getElementById('imagePreview');
+          imgEl.src = currentImageBase64;
+          imgEl.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function saveRecord() {
+      const text = document.getElementById('recordText').value.trim();
+      if (!text && !currentImageBase64) return alert('내용 또는 인증 사진을 입력해주세요.');
+
+      const newRecord = {
+        author: state.myInfo.name,
+        text: text,
+        image: currentImageBase64,
+        date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      state.records.unshift(newRecord);
+
+      // Reset Inputs
+      document.getElementById('recordText').value = '';
+      document.getElementById('recordImageInput').value = '';
+      document.getElementById('imagePreview').style.display = 'none';
+      currentImageBase64 = null;
+
+      renderRecords();
+    }
+
+    function renderRecords() {
+      const listContainer = document.getElementById('recordsList');
+      if (state.records.length === 0) {
+        listContainer.innerHTML = '등록된 기록이 없습니다.';
+        return;
+      }
+
+      listContainer.innerHTML = state.records.map(rec => `
+        <div style="background: var(--bg-color); padding: 12px; border-radius: 8px; margin-top: 10px;">
+          <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-sub);">
+            <strong>${rec.author}</strong>
+            <span>${rec.date}</span>
+          </div>
+          ${rec.text ? `<p style="margin: 8px 0 0 0; color:var(--text-main);">${rec.text}</p>` : ''}
+          ${rec.image ? `<img src="${rec.image}" class="record-img">` : ''}
+        </div>
+      `).join('');
+    }
+
+    // 5. PROFILE EDITING AFTER JOINING
+    function updateDashboard() {
+      document.getElementById('myProfileName').innerText = state.myInfo.name;
+      document.getElementById('myProfileGoal').innerText = state.myInfo.goal;
+      document.getElementById('partnerProfileName').innerText = state.partnerInfo.name;
+      document.getElementById('partnerProfileGoal').innerText = state.partnerInfo.goal;
+      renderRecords();
+    }
+
+    function openEditModal() {
+      document.getElementById('editName').value = state.myInfo.name;
+      document.getElementById('editGoal').value = state.myInfo.goal;
+      document.getElementById('editModal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+      document.getElementById('editModal').classList.add('hidden');
+    }
+
+    function saveProfileEdit() {
+      const newName = document.getElementById('editName').value.trim();
+      const newGoal = document.getElementById('editGoal').value.trim();
+
+      if (!newName || !newGoal) return alert('이름과 목표를 모두 입력해 주세요.');
+
+      state.myInfo.name = newName;
+      state.myInfo.goal = newGoal;
+
+      updateDashboard();
+      closeEditModal();
+      alert('프로필이 수정되었습니다.');
+    }
+
+    // 초기 실행
+    window.onload = function() {
+      showSection('startSection', false);
+    };
+  </script>
+</body>
+</html>
