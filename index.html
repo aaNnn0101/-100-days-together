@@ -130,7 +130,7 @@
     .day-cell.today { border: 2px solid var(--primary); }
     .day-cell.partial { background: var(--primary-light); color: var(--text-main); }
     .day-cell.complete { background: var(--primary); color: white; }
-    .day-cell.selected { outline: 2px solid var(--text-main); transform: scale(1.05); }
+    .day-cell.selected { outline: 2px solid var(--text-main); transform: scale(1.08); }
 
     .calendar-legend {
       display: flex; justify-content: flex-end; gap: 12px;
@@ -180,11 +180,51 @@
       myInfo: { name: '', goal: '', photo: null },
       partnerInfo: { name: '상대방', goal: '대기 중...', photo: null },
       createdAt: null,
-      records: [],
+      checks: [],   // { day: number, author: string } 원클릭 완수 상태 저장
+      records: [],  // 상세 사진/글 기록 저장
       selectedDay: null
     };
 
     let unsubscribeRoom = null;
+
+    // -------------------------------------------------------------
+    // 이미지 압축 Helper 함수
+    // -------------------------------------------------------------
+    window.compressImage = function(file, maxWidth = 500, quality = 0.7) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+          const img = new Image();
+          img.src = event.target.result;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > maxWidth) {
+                height *= maxWidth / width;
+                width = maxWidth;
+              }
+            } else {
+              if (height > maxWidth) {
+                width *= maxWidth / height;
+                height = maxWidth;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+        };
+      });
+    };
 
     // -------------------------------------------------------------
     // 1. 세션 저장 및 복원
@@ -216,7 +256,7 @@
         roomCode: null, role: null,
         myInfo: { name: '', goal: '', photo: null },
         partnerInfo: { name: '상대방', goal: '대기 중...', photo: null },
-        createdAt: null, records: [], selectedDay: null
+        createdAt: null, checks: [], records: [], selectedDay: null
       };
       const codeBox = document.getElementById('displayInviteCode');
       if (codeBox) codeBox.innerText = "------";
@@ -260,6 +300,7 @@
           showSection('dashboardSection');
         }
 
+        window.appState.checks = data.checks || [];
         window.appState.records = data.records || [];
         updateDashboard();
         saveSession();
@@ -292,6 +333,7 @@
           createdAt: createdAt,
           creator: { name, goal, photo: null },
           joiner: null,
+          checks: [],
           records: []
         });
 
@@ -358,17 +400,13 @@
       document.getElementById('profileModal').classList.add('hidden');
     };
 
-    window.handleProfilePhotoChange = function(event) {
+    window.handleProfilePhotoChange = async function(event) {
       const file = event.target.files[0];
       if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          window.tempProfilePhoto = e.target.result;
-          const imgPreview = document.getElementById('editPhotoPreview');
-          imgPreview.src = window.tempProfilePhoto;
-          imgPreview.style.display = 'block';
-        };
-        reader.readAsDataURL(file);
+        window.tempProfilePhoto = await window.compressImage(file, 300, 0.7);
+        const imgPreview = document.getElementById('editPhotoPreview');
+        imgPreview.src = window.tempProfilePhoto;
+        imgPreview.style.display = 'block';
       }
     };
 
@@ -402,12 +440,38 @@
     };
 
     // -------------------------------------------------------------
-    // 5. 인증 등록 및 취소 토글 기능
+    // 5. 원클릭 체크 (텍스트 기록을 생성하지 않고 달력 완수 상태만 토글)
     // -------------------------------------------------------------
-    window.saveRecord = async function(e, customText = null) {
+    window.toggleQuickCheck = async function() {
+      const currentDay = getCurrentDayNumber();
+      const myName = window.appState.myInfo.name;
+      const checks = window.appState.checks || [];
+
+      const hasChecked = checks.some(c => c.day === currentDay && c.author === myName);
+
+      let updatedChecks = [];
+      if (hasChecked) {
+        if (!confirm("오늘 인증을 취소하시겠습니까?")) return;
+        updatedChecks = checks.filter(c => !(c.day === currentDay && c.author === myName));
+      } else {
+        updatedChecks = [...checks, { day: currentDay, author: myName }];
+      }
+
+      try {
+        const roomRef = doc(db, "rooms", window.appState.roomCode);
+        await updateDoc(roomRef, { checks: updatedChecks });
+      } catch (err) {
+        alert("인증 상태 변경 실패: " + err.message);
+      }
+    };
+
+    // -------------------------------------------------------------
+    // 6. 상세 기록 저장 기능
+    // -------------------------------------------------------------
+    window.saveRecord = async function(e) {
       if (e) e.preventDefault();
 
-      const text = customText !== null ? customText : document.getElementById('recordText').value.trim();
+      const text = document.getElementById('recordText').value.trim();
       if (!text && !window.currentImageBase64) return alert('내용이나 사진을 첨부해주세요.');
 
       const currentDay = getCurrentDayNumber();
@@ -425,51 +489,33 @@
 
       try {
         const roomRef = doc(db, "rooms", window.appState.roomCode);
-        await updateDoc(roomRef, {
-          records: arrayUnion(newRecord)
-        });
-
-        if (!customText) {
-          document.getElementById('recordText').value = '';
-          document.getElementById('recordImageInput').value = '';
-          document.getElementById('imagePreview').style.display = 'none';
-          window.currentImageBase64 = null;
+        
+        // 상세 글을 남길 때 달력 체크가 아직 안 되어있다면 함께 체크
+        const checks = window.appState.checks || [];
+        const hasChecked = checks.some(c => c.day === currentDay && c.author === window.appState.myInfo.name);
+        let updateData = { records: arrayUnion(newRecord) };
+        
+        if (!hasChecked) {
+          updateData.checks = arrayUnion({ day: currentDay, author: window.appState.myInfo.name });
         }
+
+        await updateDoc(roomRef, updateData);
+
+        document.getElementById('recordText').value = '';
+        document.getElementById('recordImageInput').value = '';
+        document.getElementById('imagePreview').style.display = 'none';
+        window.currentImageBase64 = null;
+        
+        // 작성한 그 날의 기록이 바로 보일 수 있게 해당 일자 선택
+        window.appState.selectedDay = currentDay;
+        updateDashboard();
       } catch (err) {
         alert("기록 저장 실패: " + err.message);
       }
     };
 
-    // 원클릭 체크 toggle (체크 등록 또는 취소)
-    window.toggleQuickCheck = async function() {
-      const currentDay = getCurrentDayNumber();
-      const myName = window.appState.myInfo.name;
-      const records = window.appState.records || [];
-
-      // 오늘 내가 작성한 체크가 있는지 확인
-      const hasCheckedToday = records.some(r => r.day === currentDay && r.author === myName);
-
-      if (hasCheckedToday) {
-        // 취소 처리 confirm
-        if (!confirm("오늘 인증을 취소하시겠습니까?")) return;
-
-        // 오늘 내 기록 제외하고 업데이트
-        const updatedRecords = records.filter(r => !(r.day === currentDay && r.author === myName));
-
-        try {
-          const roomRef = doc(db, "rooms", window.appState.roomCode);
-          await updateDoc(roomRef, { records: updatedRecords });
-        } catch (err) {
-          alert("인증 취소 실패: " + err.message);
-        }
-      } else {
-        // 인증 등록
-        window.saveRecord(null, "오늘 목표 완수!");
-      }
-    };
-
     // -------------------------------------------------------------
-    // 6. 댓글 작성 기능
+    // 7. 댓글 작성 기능
     // -------------------------------------------------------------
     window.addComment = async function(recordId) {
       const inputEl = document.getElementById(`commentInput_${recordId}`);
@@ -526,21 +572,18 @@
       const currentDay = getCurrentDayNumber();
       document.getElementById('currentDay').innerText = currentDay;
       
-      // 내 프로필 업데이트
       const myInfo = window.appState.myInfo;
       document.getElementById('myProfileName').innerText = myInfo.name || '나';
       document.getElementById('myProfileGoal').innerText = myInfo.goal || '목표';
       renderAvatar('myAvatar', myInfo.photo, myInfo.name);
 
-      // 상대방 프로필 업데이트
       const partnerInfo = window.appState.partnerInfo;
       document.getElementById('partnerProfileName').innerText = partnerInfo.name || '상대방';
       document.getElementById('partnerProfileGoal').innerText = partnerInfo.goal || '대기 중...';
       renderAvatar('partnerAvatar', partnerInfo.photo, partnerInfo.name);
 
-      // 오늘 간편 체크 상태 업데이트 및 취소 버튼 연동
-      const records = window.appState.records || [];
-      const hasCheckedToday = records.some(r => r.day === currentDay && r.author === myInfo.name);
+      const checks = window.appState.checks || [];
+      const hasCheckedToday = checks.some(c => c.day === currentDay && c.author === myInfo.name);
       const quickBtn = document.getElementById('quickCheckBtn');
       if (quickBtn) {
         if (hasCheckedToday) {
@@ -570,13 +613,13 @@
       const calendarEl = document.getElementById('calendarGrid');
       if (!calendarEl) return;
 
-      const records = window.appState.records || [];
+      const checks = window.appState.checks || [];
       const dayStats = {};
 
-      records.forEach(rec => {
-        const d = rec.day || 1;
+      checks.forEach(chk => {
+        const d = chk.day || 1;
         if (!dayStats[d]) dayStats[d] = new Set();
-        dayStats[d].add(rec.author);
+        dayStats[d].add(chk.author);
       });
 
       let html = '';
@@ -617,19 +660,23 @@
     function renderRecords() {
       const listContainer = document.getElementById('recordsList');
       const filterTitle = document.getElementById('filterTitle');
-      let records = window.appState.records || [];
+      const clearBtn = document.getElementById('clearFilterBtn');
 
-      if (window.appState.selectedDay) {
-        records = records.filter(r => r.day === window.appState.selectedDay);
-        filterTitle.innerText = `DAY ${window.appState.selectedDay} 기록 (${records.length}개)`;
-        document.getElementById('clearFilterBtn').classList.remove('hidden');
-      } else {
-        filterTitle.innerText = '전체 기록 목록';
-        document.getElementById('clearFilterBtn').classList.add('hidden');
+      // 날짜를 선택하지 않은 경우 안내 메시지 표시
+      if (!window.appState.selectedDay) {
+        filterTitle.innerText = '상세 기록 보기';
+        clearBtn.classList.add('hidden');
+        listContainer.innerHTML = '<div style="color:var(--text-sub); font-size:0.9rem; padding: 15px 0; text-align:center;">📅 위의 달력에서 날짜를 누르면 그날의 상세 기록을 볼 수 있습니다.</div>';
+        return;
       }
 
+      // 선택한 날짜의 상세 기록만 필터링
+      const records = (window.appState.records || []).filter(r => r.day === window.appState.selectedDay);
+      filterTitle.innerText = `DAY ${window.appState.selectedDay} 상세 기록 (${records.length}개)`;
+      clearBtn.classList.remove('hidden');
+
       if (records.length === 0) {
-        listContainer.innerHTML = '<div style="color:var(--text-sub); font-size:0.9rem; padding: 10px 0;">등록된 기록이 없습니다.</div>';
+        listContainer.innerHTML = `<div style="color:var(--text-sub); font-size:0.9rem; padding: 15px 0; text-align:center;">DAY ${window.appState.selectedDay}에 남긴 상세 글/사진 기록이 없습니다.</div>`;
         return;
       }
 
@@ -787,13 +834,13 @@
         </form>
       </section>
 
-      <!-- 기록 목록 & 댓글 -->
+      <!-- 특정 날짜 클릭 시 기록 및 댓글 표시 영역 -->
       <section style="padding: 15px; margin-top: 15px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h2 id="filterTitle">전체 기록 목록</h2>
-          <button type="button" id="clearFilterBtn" class="secondary hidden" onclick="clearDayFilter()" style="width:auto; padding:4px 10px; font-size:0.8rem; margin:0;">전체 보기</button>
+          <h2 id="filterTitle">상세 기록 보기</h2>
+          <button type="button" id="clearFilterBtn" class="secondary hidden" onclick="clearDayFilter()" style="width:auto; padding:4px 10px; font-size:0.8rem; margin:0;">닫기</button>
         </div>
-        <div id="recordsList">등록된 기록이 없습니다.</div>
+        <div id="recordsList">달력에서 날짜를 클릭해주세요.</div>
       </section>
 
       <button type="button" class="secondary" onclick="resetSession()" style="margin-top:20px;">나가기 / 초기화</button>
@@ -825,17 +872,14 @@
     window.currentImageBase64 = null;
     window.tempProfilePhoto = null;
 
-    function previewImage(event) {
+    // 상세 기록 이미지 첨부 시 압축 처리
+    async function previewImage(event) {
       const file = event.target.files[0];
       if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          window.currentImageBase64 = e.target.result;
-          const imgEl = document.getElementById('imagePreview');
-          imgEl.src = window.currentImageBase64;
-          imgEl.style.display = 'block';
-        };
-        reader.readAsDataURL(file);
+        window.currentImageBase64 = await window.compressImage(file, 500, 0.7);
+        const imgEl = document.getElementById('imagePreview');
+        imgEl.src = window.currentImageBase64;
+        imgEl.style.display = 'block';
       }
     }
 
